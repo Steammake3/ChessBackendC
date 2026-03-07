@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "position.h"
+#include "zobrist.h"
 
 #define NO_SQ 64
 #define WHITE 0
@@ -13,7 +14,8 @@
 #define MOVE_TO(m)     (((m) >> 6) & 0x3F)   // next 6 bits
 #define MOVE_FLAGS(m)  (((m) >> 12) & 0xF)   // top 4 bits
 
-#define MAKE_MOVE(f,t,fl)  ((f) | ((t)<<6) | ((fl)<<12))
+#define MAKE_MOVE(f,t,fl)  (uint16_t) ((f) | ((t)<<6) | ((fl)<<12))
+#define ABS(a) ((a>0) ? a : -a)
 
 /*
 typedef enum {
@@ -30,8 +32,11 @@ typedef struct {
     uint16_t fullmove;
     bool side_to_move;
     uint8_t castling_rights;
+    uint64_t zobrist;
 } Position;
  */
+
+uint8_t CHEBYSHEV[64][64];
 
 void add_piece(int index, Position *position, char piece){
     //Adds a piece to `position` at `index` via FEN (so Q is White Queen) 
@@ -98,6 +103,8 @@ void load_position(const char fen[], Position *position){
         position->occupancies[1] |= position->bitboards[b+6];
     }
     position->occupancies[2] = position->occupancies[0] | position->occupancies[1];
+
+    init_hash(position);
 }
 
 char* unload_position(Position* position){
@@ -157,5 +164,74 @@ char* unload_position(Position* position){
     idx += sprintf(idx, " %d %d", position->halfmove, position->fullmove);
 
     return fen;
+}
+
+void init_hash(Position *pos){
+    init_zobrist();
+
+    uint64_t hash = 0ULL;
+    for (int i=0; i<64; i++){
+        int piece_type = piece_at(i, pos);
+        if (piece_type==NO_SQ) {continue;}
+        hash ^= zh_pieces[piece_type][i];
+    }
+
+    hash ^= zh_castles[pos->castling_rights];
+    hash ^= (pos->en_passant)==NO_SQ ? 0 : zh_ep_file[(pos->en_passant)%8];
+
+    hash ^= pos->side_to_move ? zh_side : 0;
+
+    pos->zobrist = hash;
+}
+
+void make_move(Position *pos, uint16_t move, Undo *undo){
+    //Set up for ease
+    int start_sq = MOVE_FROM(move);
+    int end_sq = MOVE_TO(move);
+    int promo = MOVE_FLAGS(move);
+    int side = pos->side_to_move;
+
+    int start_piece = piece_at(start_sq, pos);
+    int captured_piece = piece_at(end_sq, pos);
+
+    //Undo pushed
+    undo->captured = captured_piece;
+    undo->castle = pos->castling_rights;
+    undo->ep = pos->en_passant;
+    undo->hash = pos->zobrist;
+
+    //Move making
+    switch (start_piece%6){
+        case (WK):
+            if (CHEBYSHEV[start_sq][end_sq]>1){
+                if (ABS((int)start_sq-end_sq) == 2){
+                    //TODO: Castling
+
+                }
+            }
+    }
+
+}
+
+void unmake_move(Position *pos, uint16_t move, Undo *undo){}
+
+void precompute_chebyshev(){
+    //ChatGPT generated, I don't care bcz it's just a formula
+    for (int a = 0; a < 64; a++) {
+        int file_a = a & 7;
+        int rank_a = a >> 3;
+        for (int b = 0; b < 64; b++) {
+            int file_b = b & 7;
+            int rank_b = b >> 3;
+
+            int df = file_a - file_b;
+            if (df < 0) df = -df;
+
+            int dr = rank_a - rank_b;
+            if (dr < 0) dr = -dr;
+
+            CHEBYSHEV[a][b] = (df > dr) ? df : dr;
+        }
+    }
 }
 

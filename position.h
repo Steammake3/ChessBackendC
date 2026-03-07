@@ -19,6 +19,15 @@ typedef struct {
     uint64_t zobrist;
 } Position;
 
+typedef struct {
+    uint8_t captured;
+    uint8_t castle;
+    uint8_t ep;
+    uint64_t hash;
+} Undo;
+
+extern uint8_t CHEBYSHEV[64][64];
+
 void add_piece(int index, Position *position, char piece);
 
 int piece_at(int index, Position *position);
@@ -26,4 +35,12 @@ int piece_at(int index, Position *position);
 void load_position(const char fen[], Position *position);
 
 char* unload_position(Position* position);
+
+void init_hash(Position *pos);
+
+void make_move(Position *position, uint16_t move, Undo *undo);
+
+void unmake_move(Position *position, uint16_t move, Undo *undo);
+
+void precompute_chebyshev();
 #endif
