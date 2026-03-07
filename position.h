@@ -16,6 +16,7 @@ typedef struct {
     uint16_t fullmove;
     bool side_to_move;
     uint8_t castling_rights;
+    uint64_t zobrist;
 } Position;
 
 void add_piece(int index, Position *position, char piece);

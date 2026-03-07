@@ -9,10 +9,19 @@
 #define WHITE 0
 #define BLACK 1
 
+#define MOVE_FROM(m)   ((m) & 0x3F)          // 0b111111
+#define MOVE_TO(m)     (((m) >> 6) & 0x3F)   // next 6 bits
+#define MOVE_FLAGS(m)  (((m) >> 12) & 0xF)   // top 4 bits
+
+#define MAKE_MOVE(f,t,fl)  ((f) | ((t)<<6) | ((fl)<<12))
+
+/*
 typedef enum {
     WP, WN, WB, WR, WQ, WK, BP, BN, BB, BR, BQ, BK
 } Pieces;
+ 
 
+ 
 typedef struct {
     uint64_t bitboards[12]; //White Pawn, Knight, Bishop ... Black Pawn... (PNBRQK)
     uint64_t occupancies[3]; //White, Black, Both
@@ -22,6 +31,7 @@ typedef struct {
     bool side_to_move;
     uint8_t castling_rights;
 } Position;
+ */
 
 void add_piece(int index, Position *position, char piece){
     //Adds a piece to `position` at `index` via FEN (so Q is White Queen) 
@@ -58,12 +68,15 @@ void load_position(const char fen[], Position *position){
     sscanf(fen, "%71s %c %4s %2s %d %d", pieces, &side, castles, ep, &halfmove, &fullmove);
 
     int cur_sq = 56;
-    for (int i=0; pieces[i]!='\0'; i++){
-        char thischar = pieces[i];
-        if (thischar=='/'){cur_sq-=15; continue;}
-        else if (isdigit(thischar)){cur_sq+=(thischar-'0'); continue;}
-        else {add_piece(cur_sq, position, thischar);}
-        cur_sq++;
+    for (int i = 0; pieces[i] != '\0'; i++) {
+        char c = pieces[i];
+
+        if (c == '/') {cur_sq -= 16;}
+        else if (isdigit(c)) {cur_sq += c - '0';}
+        else {
+            add_piece(cur_sq, position, c);
+            cur_sq++;
+        }
     }
 
     position->side_to_move = (side=='w');
@@ -95,32 +108,25 @@ char* unload_position(Position* position){
     const char piece_to_char[] = "PNBRQKpnbrqk";
 
     //Pieces
-    int empty = 0;
-    int cur_sq = 56;
-    for (int i=0; i<64; i++){
-        int cur_piece = piece_at(cur_sq, position);
-        if (cur_piece==NO_SQ) {empty++;}
-        else {
-            if (empty==0) {
-                *idx++ = piece_to_char[cur_piece];
+    int empty;
+    for (int rank = 7; rank >= 0; rank--) {
+        empty = 0;
+        for (int file = 0; file < 8; file++) {
+            int sq = rank * 8 + file;
+            int piece = piece_at(sq, position);
+            if (piece == NO_SQ) {
+                empty++;
+            } else {
+                if (empty > 0) {
+                    *idx++ = '0' + empty;
+                    empty = 0;
+                }
+            *idx++ = piece_to_char[piece];
             }
-            else { //In the case that there have been empties
-                *idx++ = '0' + empty;
-                empty = 0;
-            } 
         }
-        cur_sq++;
 
-        if ((i % 8) == 7){
-            if (empty > 0){
-                *idx++ = '0' + empty;
-                empty = 0;
-            }
-
-            if (i != 63) *idx++ = '/';
-
-            cur_sq -= 15; // go down one rank (15 not 16)
-        }
+        if (empty > 0){*idx++ = '0' + empty;}
+        if (rank > 0) {*idx++ = '/';}
     }
 
     //Side
@@ -152,3 +158,4 @@ char* unload_position(Position* position){
 
     return fen;
 }
+
