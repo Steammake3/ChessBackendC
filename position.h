@@ -15,7 +15,7 @@ typedef struct {
     uint16_t halfmove;
     uint16_t fullmove;
     bool side_to_move;
-    uint8_t castling_rights;
+    uint8_t castling_rights; //KQkq White then Black
     uint64_t zobrist;
 } Position;
 

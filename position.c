@@ -9,6 +9,7 @@
 #define NO_SQ 64
 #define WHITE 0
 #define BLACK 1
+#define BOTH 2
 
 #define MOVE_FROM(m)   ((m) & 0x3F)          // 0b111111
 #define MOVE_TO(m)     (((m) >> 6) & 0x3F)   // next 6 bits
@@ -84,13 +85,13 @@ void load_position(const char fen[], Position *position){
         }
     }
 
-    position->side_to_move = (side=='w');
+    position->side_to_move = (side=='b');
 
     position->castling_rights = 0;
-    if (strchr(castles,'K')) position->castling_rights |= 1<<0;
-    if (strchr(castles,'Q')) position->castling_rights |= 1<<1;
-    if (strchr(castles,'k')) position->castling_rights |= 1<<2;
-    if (strchr(castles,'q')) position->castling_rights |= 1<<3;
+    if (strchr(castles,'K')) position->castling_rights |= 1<<3;
+    if (strchr(castles,'Q')) position->castling_rights |= 1<<2;
+    if (strchr(castles,'k')) position->castling_rights |= 1<<1;
+    if (strchr(castles,'q')) position->castling_rights |= 1<<0;
 
     position->en_passant = (ep[0]=='-') ? NO_SQ : (ep[1]-'1')*8 + (ep[0]-'a');
 
@@ -138,17 +139,17 @@ char* unload_position(Position* position){
 
     //Side
     *idx++ = ' ';
-    *idx++ = position->side_to_move ? 'w' : 'b';
+    *idx++ = position->side_to_move ? 'b' : 'w';
 
     //To Castle or Not
     *idx++ = ' ';
     if (position->castling_rights == 0){
         *idx++ = '-';
     } else {
-        if (position->castling_rights & 1) *idx++ = 'K';
-        if (position->castling_rights & 2) *idx++ = 'Q';
-        if (position->castling_rights & 4) *idx++ = 'k';
-        if (position->castling_rights & 8) *idx++ = 'q';
+        if (position->castling_rights & 8) *idx++ = 'K';
+        if (position->castling_rights & 4) *idx++ = 'Q';
+        if (position->castling_rights & 2) *idx++ = 'k';
+        if (position->castling_rights & 1) *idx++ = 'q';
     }
 
     //En Passant the doom of all programmers (Rio has no trouble tho)
@@ -202,15 +203,54 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
 
     //Move making
     switch (start_piece%6){
-        case (WK):
-            if (CHEBYSHEV[start_sq][end_sq]>1){
-                if (ABS((int)start_sq-end_sq) == 2){
-                    //TODO: Castling
 
+        case (WK): //King
+            
+            if ((start_sq==4 || start_sq==60)){ //Declining the right to castle
+                pos->castling_rights &= (side==BLACK) ? 0b1100 : 0b0011;
+            }
+
+            if (ABS((int)start_sq-end_sq) == 2){ //Castling
+                if (start_sq<end_sq){ //Kingside
+                    if (side==BLACK){ //Black Kingside
+                        pos->bitboards[BK] ^= (1ULL<<60) | (1ULL<<62);
+                        pos->bitboards[BR] ^= (1ULL<<63) | (1ULL<<61);
+                        pos->occupancies[BLACK] ^= (0xFULL << 60); //Combines the top ones tbh
+                    } else { //White Kingside
+                        pos->bitboards[WK] ^= (1ULL<<4) | (1ULL<<6);
+                        pos->bitboards[WR] ^= (1ULL<<7) | (1ULL<<5);
+                        pos->occupancies[WHITE] ^= 0xF0ULL; //Combines the top ones btw
+                    }
+                } else { //Queenside
+                    if (side==BLACK){ //Black Queenside
+                        pos->bitboards[BK] ^= (1ULL<<60) | (1ULL<<58);
+                        pos->bitboards[BR] ^= (1ULL<<56) | (1ULL<<59);
+                        pos->occupancies[BLACK] ^= (0b11101ULL << 56); //Combines the top ones tbh
+                    } else { //White Queenside
+                        pos->bitboards[WK] ^= (1ULL<<4) | (1ULL<<2);
+                        pos->bitboards[WR] ^= (1ULL<<0) | (1ULL<<3);
+                        pos->occupancies[WHITE] ^= 0b11101; //Combines the top ones (manually) btw
+                    }
+                }
+            } else { //Regular move
+                pos->bitboards[side==BLACK? BK : WK] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+                if (captured_piece!=NO_SQ) { //If a capture
+                    pos->bitboards[captured_piece] ^= (1ULL<<end_sq);
+                    pos->occupancies[side] ^= (1ULL<<start_sq);
+                    pos->occupancies[side^1] ^= (1ULL<<end_sq);
+                } else {
+                    pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
                 }
             }
-    }
 
+            if (end_sq==(side==BLACK ? 0 : 56) || end_sq==(side==BLACK ? 7 : 63)){
+                pos->castling_rights &= ~(side==BLACK ? (end_sq==0 ? 4 : 8) : (end_sq==56 ? 1 : 2));
+            }
+            break;
+        
+        case (WR): //TODO: rook
+    }
+    pos->occupancies[BOTH] = pos->occupancies[WHITE] | pos->occupancies[BLACK];
 }
 
 void unmake_move(Position *pos, uint16_t move, Undo *undo){}
