@@ -194,66 +194,163 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
 
     int start_piece = piece_at(start_sq, pos);
     int captured_piece = piece_at(end_sq, pos);
+    bool en_passanting = (end_sq==pos->en_passant && (start_piece%6)==0); //This makes it DRY
 
     //Undo pushed
     undo->captured = captured_piece;
     undo->castle = pos->castling_rights;
     undo->ep = pos->en_passant;
+    undo->halfmove = pos->halfmove;
+    undo->fullmove = pos->fullmove;
     undo->hash = pos->zobrist;
+    undo->flags = 0;
 
-    //Move making
-    switch (start_piece%6){
+    //Move making :)
 
-        case (WK): //King
-            
-            if ((start_sq==4 || start_sq==60)){ //Declining the right to castle
-                pos->castling_rights &= (side==BLACK) ? 0b1100 : 0b0011;
-            }
+    pos->en_passant = NO_SQ;
 
-            if (ABS((int)start_sq-end_sq) == 2){ //Castling
-                if (start_sq<end_sq){ //Kingside
-                    if (side==BLACK){ //Black Kingside
-                        pos->bitboards[BK] ^= (1ULL<<60) | (1ULL<<62);
-                        pos->bitboards[BR] ^= (1ULL<<63) | (1ULL<<61);
-                        pos->occupancies[BLACK] ^= (0xFULL << 60); //Combines the top ones tbh
-                    } else { //White Kingside
-                        pos->bitboards[WK] ^= (1ULL<<4) | (1ULL<<6);
-                        pos->bitboards[WR] ^= (1ULL<<7) | (1ULL<<5);
-                        pos->occupancies[WHITE] ^= 0xF0ULL; //Combines the top ones btw
-                    }
-                } else { //Queenside
-                    if (side==BLACK){ //Black Queenside
-                        pos->bitboards[BK] ^= (1ULL<<60) | (1ULL<<58);
-                        pos->bitboards[BR] ^= (1ULL<<56) | (1ULL<<59);
-                        pos->occupancies[BLACK] ^= (0b11101ULL << 56); //Combines the top ones tbh
-                    } else { //White Queenside
-                        pos->bitboards[WK] ^= (1ULL<<4) | (1ULL<<2);
-                        pos->bitboards[WR] ^= (1ULL<<0) | (1ULL<<3);
-                        pos->occupancies[WHITE] ^= 0b11101; //Combines the top ones (manually) btw
-                    }
-                }
-            } else { //Regular move
-                pos->bitboards[side==BLACK? BK : WK] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
-                if (captured_piece!=NO_SQ) { //If a capture
-                    pos->bitboards[captured_piece] ^= (1ULL<<end_sq);
-                    pos->occupancies[side] ^= (1ULL<<start_sq);
-                    pos->occupancies[side^1] ^= (1ULL<<end_sq);
-                } else {
-                    pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
-                }
-            }
+    //Castling rights
+    if (start_piece==WK) pos->castling_rights &= 0b0011;
+    if (start_piece==BK) pos->castling_rights &= 0b1100;
+    if (start_sq==56 || end_sq==56) pos->castling_rights &= ~1;
+    if (start_sq==63 || end_sq==63) pos->castling_rights &= ~2;
+    if (start_sq==0 || end_sq==0) pos->castling_rights &= ~4;
+    if (start_sq==7 || end_sq==7) pos->castling_rights &= ~8;
+    //Zob
+    pos->zobrist ^= zh_castles[undo->castle] ^ zh_castles[pos->castling_rights];
 
-            if (end_sq==(side==BLACK ? 0 : 56) || end_sq==(side==BLACK ? 7 : 63)){
-                pos->castling_rights &= ~(side==BLACK ? (end_sq==0 ? 4 : 8) : (end_sq==56 ? 1 : 2));
-            }
-            break;
-        
-        case (WR): //TODO: rook
+    //Actual Castling (Rook side)
+    if(start_piece%6==5 && ABS(start_sq-end_sq)==2){
+        int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
+        int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq+2;
+        pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
+        pos->occupancies[side] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
+        //Zob
+        pos->zobrist ^= zh_pieces[side==WHITE?WR:BR][rook_from];
+        pos->zobrist ^= zh_pieces[side==WHITE?WR:BR][rook_to];
+        //For the Undo
+        undo->flags = 2;
     }
+
+    //True move in progress, crazy i know right?
+    pos->bitboards[start_piece] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+    pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+    //Zob
+    pos->zobrist ^= zh_pieces[start_piece][start_sq];
+    pos->zobrist ^= zh_pieces[start_piece][end_sq];
+
+    //Normal capture, so not en passant
+    if(captured_piece!=NO_SQ && !(en_passanting)){
+        pos->bitboards[captured_piece] ^= 1ULL<<end_sq;
+        pos->occupancies[side^1] ^= 1ULL<<end_sq;
+        //Zob
+        pos->zobrist ^= zh_pieces[captured_piece][end_sq];
+    }
+
+    //En passant
+    if (en_passanting) {
+        int cap_sq = side==BLACK ? end_sq+8 : end_sq-8;
+        pos->bitboards[(side^1)*6+0] ^= (1ULL<<cap_sq);
+        pos->occupancies[side^1] ^= (1ULL<<cap_sq);
+        //Zob
+        pos->zobrist ^= zh_pieces[(side^1)*6+0][cap_sq];
+        //For the Undo flags
+        undo->flags = 1;
+    }
+
+    //Promotion
+    if (start_piece%6==0 && (end_sq>>3==0 || end_sq>>3==7)){
+        pos->bitboards[start_piece] ^= (1ULL << end_sq);
+        pos->bitboards[6*side+4-promo] ^= (1ULL << end_sq);
+        //Zob
+        pos->zobrist ^= zh_pieces[start_piece][end_sq];
+        pos->zobrist ^= zh_pieces[6*side+4-promo][end_sq];
+        //You know the drill by now
+        undo->flags = 3;
+    }
+
+    //Double pawn pushes
+    if (start_piece%6==0 && ABS(start_sq-end_sq)==16){
+        pos->en_passant = (start_sq+end_sq)/2;
+        //Zob later
+    }
+
+    //Half&Full Move
+    if (start_piece%6==0 ||  captured_piece!=NO_SQ){
+        pos->halfmove = 0;
+    } else {pos->halfmove++;}
+    if (side==BLACK) pos->fullmove++;
+
+    //Side
+    pos->side_to_move = !pos->side_to_move;
+    //Zob
+    pos->zobrist ^= zh_side;
+
+    //Update final occupancies & EP File Zob
     pos->occupancies[BOTH] = pos->occupancies[WHITE] | pos->occupancies[BLACK];
+    if (undo->ep != NO_SQ)
+        pos->zobrist ^= zh_ep_file[undo->ep % 8];
+    if (pos->en_passant != NO_SQ)
+        pos->zobrist ^= zh_ep_file[pos->en_passant % 8];
 }
 
-void unmake_move(Position *pos, uint16_t move, Undo *undo){}
+void unmake_move(Position *pos, uint16_t move, Undo *undo){
+    pos->side_to_move = !pos->side_to_move;
+
+    int start_sq = MOVE_FROM(move);
+    int end_sq = MOVE_TO(move);
+    int promo = MOVE_FLAGS(move);
+    int side = pos->side_to_move;
+    //Btw all detection for special moves is done in make_move (to be DRY)
+    int start_piece = piece_at(end_sq, pos); //Bcz move has been made
+    int captured_piece = undo->captured; //Does not include EP
+
+    //Quick undo restoration
+    pos->en_passant = undo->ep;
+    pos->castling_rights = undo->castle;
+    pos->halfmove = undo->halfmove;
+    pos->fullmove = undo->fullmove;
+    pos->zobrist = undo->hash;
+
+    //Generic move is always done (except for promo)
+    if (undo->flags == 3) { //promo
+        int pawn = (side==WHITE ? WP : BP);
+
+        pos->bitboards[start_piece] ^= (1ULL<<end_sq); // remove promoted piece
+        pos->bitboards[pawn] ^= (1ULL<<start_sq);      // restore pawn
+
+        pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+    } else {
+        pos->bitboards[start_piece] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+        pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+    }
+
+    switch (undo->flags) {
+        case 1: //En passant
+            int cap_sq = side==BLACK ? end_sq+8 : end_sq-8;
+            pos->bitboards[(side^1)*6+WP] ^= (1ULL<<cap_sq);
+            pos->occupancies[side^1] ^= (1ULL<<cap_sq);
+            break;
+        
+        case 2: //Castling
+            int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
+            int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq+2;
+            pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
+            pos->occupancies[side] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
+            break;
+        
+        case 3: break; //Promotion previously handled
+        
+        default: break; //Silent move
+    }
+
+    if (captured_piece!=NO_SQ){ //In case of normal capture
+        pos->bitboards[captured_piece] ^= 1ULL<<end_sq;
+        pos->occupancies[side^1] ^= 1ULL<<end_sq;
+    }
+
+    pos->occupancies[BOTH] = pos->occupancies[WHITE] | pos->occupancies[BLACK];
+}
 
 void precompute_chebyshev(){
     //ChatGPT generated, I don't care bcz it's just a formula

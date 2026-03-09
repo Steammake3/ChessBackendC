@@ -23,7 +23,10 @@ typedef struct {
     uint8_t captured;
     uint8_t castle;
     uint8_t ep;
+    uint16_t halfmove;
+    uint16_t fullmove;
     uint64_t hash;
+    uint8_t flags; //0 Normal, 1 EP, 2 Castle, 3 Promotion
 } Undo;
 
 extern uint8_t CHEBYSHEV[64][64];
