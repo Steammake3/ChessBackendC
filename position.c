@@ -326,18 +326,18 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
     }
 
     switch (undo->flags) {
-        case 1: //En passant
+        case 1: {//En passant
             int cap_sq = side==BLACK ? end_sq+8 : end_sq-8;
             pos->bitboards[(side^1)*6+WP] ^= (1ULL<<cap_sq);
             pos->occupancies[side^1] ^= (1ULL<<cap_sq);
-            break;
+            break;}
         
-        case 2: //Castling
+        case 2: {//Castling
             int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
             int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq+2;
             pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
             pos->occupancies[side] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
-            break;
+            break;}
         
         case 3: break; //Promotion previously handled
         
@@ -372,3 +372,21 @@ void precompute_chebyshev(){
     }
 }
 
+void precompute_edgedists(){
+    for (uint8_t r=0; r<8; r++){
+        for (uint8_t f=0; f<8; f++){
+            uint8_t sq = r*8+f;
+            uint8_t n=7-r, s=r, e=7-f, w=f;
+            uint8_t ne=MIN(n,e), nw=MIN(n,w), se=MIN(s,e), sw=MIN(s,w);
+            //GOOOOOOOOOOOOOOOO!
+            EDGEDISTS[sq][0] = se;
+            EDGEDISTS[sq][1] = sw;
+            EDGEDISTS[sq][2] = ne;
+            EDGEDISTS[sq][3] = nw;
+            EDGEDISTS[sq][4] = s;
+            EDGEDISTS[sq][5] = w;
+            EDGEDISTS[sq][6] = e;
+            EDGEDISTS[sq][7] = n;
+        }
+    }
+}

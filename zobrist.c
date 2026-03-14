@@ -6,7 +6,7 @@ uint64_t zh_castles[16];
 uint64_t zh_ep_file[8];
 uint64_t zh_side;
 
-static initialized = false;
+static bool initialized = false;
 
 static uint64_t seed = 88172645463325252ULL;
 static uint64_t xorshift64_state;

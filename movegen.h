@@ -1,0 +1,48 @@
+#ifndef MOVEGEN_H
+#define MOVEGEN_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "position.h"
+
+extern uint64_t knight_attacks[64];
+extern uint64_t king_attacks[64];
+extern uint64_t pawn_attacks[2][64]; // [side][square]
+
+typedef struct {
+    uint16_t moves[256];
+    uint16_t count;
+} MoveList;
+
+void generate_moves(Position *pos, MoveList *moves);
+
+void move_list_concat(MoveList *dest, MoveList *src);
+
+void generate_sliding_moves(Position *pos, MoveList *moves);
+
+void generate_pawn_moves(Position *pos, MoveList *moves);
+
+void generate_K_N_moves(Position *pos, MoveList *moves);
+
+bool is_in_check(Position *pos);
+
+static inline int pop_lsb(uint64_t *b) {
+    int sq = __builtin_ctzll(*b);
+    *b &= *b - 1;
+    return sq;
+}
+
+//Attack calcs functions for knp unnecessary to call, me just use lookup :)
+uint64_t generate_king_attacks(uint8_t sq);
+uint64_t generate_knight_attacks(uint8_t sq);
+uint64_t generate_pawn_attacks(uint8_t sq, int side);
+//No need for queen, it's just a rook|bishop
+uint64_t generate_rook_attacks(uint8_t sq, uint64_t occ);
+uint64_t generate_bishop_attacks(uint8_t sq, uint64_t occ);
+
+bool square_attacked(Position *pos, int sq, int by_side);
+
+//Pin & Checks
+void compute_pins(Position *pos, uint64_t *pinned, uint64_t pin_dir[64]);
+
+#endif

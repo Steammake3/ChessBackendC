@@ -4,6 +4,20 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define NO_SQ 64
+#define WHITE 0
+#define BLACK 1
+#define BOTH 2
+
+#define MOVE_FROM(m)   ((m) & 0x3F)          // 0b111111
+#define MOVE_TO(m)     (((m) >> 6) & 0x3F)   // next 6 bits
+#define MOVE_FLAGS(m)  (((m) >> 12) & 0xF)   // top 4 bits
+
+#define MAKE_MOVE(f,t,fl)  (uint16_t) ((f) | ((t)<<6) | ((fl)<<12))
+#define ABS(a) ((a>0) ? a : -a)
+#define MIN(a,b) (a<b?a:b)
+#define BBd(sq) (1ULL<<(sq))
+
 typedef enum {
     WP, WN, WB, WR, WQ, WK, BP, BN, BB, BR, BQ, BK
 } Pieces;
@@ -30,6 +44,8 @@ typedef struct {
 } Undo;
 
 extern uint8_t CHEBYSHEV[64][64];
+extern uint8_t EDGEDISTS[64][8];
+extern const int8_t DIRECTIONS[8] = {-9,-7,7,9,-8,-1,1,8}; 
 
 void add_piece(int index, Position *position, char piece);
 
