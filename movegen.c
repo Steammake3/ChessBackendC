@@ -36,8 +36,9 @@ void init_attack_tables() {
 
 bool ep_is_legal(Position *pos, int from, int ep_to){
     Undo undid; LegalData legs;
+    bool side = pos->side_to_move;
     make_move(pos, MAKE_MOVE(from, ep_to, 0), &undid);
-    compute_pins_n_checks(pos, &legs);
+    pos->side_to_move=side; compute_pins_n_checks(pos, &legs); pos->side_to_move=side^1;
     unmake_move(pos, MAKE_MOVE(from, ep_to, 0), &undid);
     return legs.checkers==0;
 }
