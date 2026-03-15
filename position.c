@@ -6,17 +6,6 @@
 #include "position.h"
 #include "zobrist.h"
 
-#define NO_SQ 64
-#define WHITE 0
-#define BLACK 1
-#define BOTH 2
-
-#define MOVE_FROM(m)   ((m) & 0x3F)          // 0b111111
-#define MOVE_TO(m)     (((m) >> 6) & 0x3F)   // next 6 bits
-#define MOVE_FLAGS(m)  (((m) >> 12) & 0xF)   // top 4 bits
-
-#define MAKE_MOVE(f,t,fl)  (uint16_t) ((f) | ((t)<<6) | ((fl)<<12))
-#define ABS(a) ((a>0) ? a : -a)
 
 /*
 typedef enum {
@@ -38,6 +27,8 @@ typedef struct {
  */
 
 uint8_t CHEBYSHEV[64][64];
+uint8_t EDGEDISTS[64][8];
+const int8_t DIRECTIONS[8] = {-9,-7,7,9,-8,-1,1,8};
 
 void add_piece(int index, Position *position, char piece){
     //Adds a piece to `position` at `index` via FEN (so Q is White Queen) 

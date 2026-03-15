@@ -2,13 +2,17 @@
 #include <string.h>
 #include "position.h"
 #include "zobrist.h"
+#include "movegen.h"
 
 int fen_check();
 int zobrist_check();
 int move_making_check();
+int perft_test();
+uint64_t perft(Position *pos, int depth);
+void perft_divide(Position *pos, int depth);
 
 int main(){
-    return move_making_check();
+    return perft_test();
 }
 
 int fen_check()
@@ -60,4 +64,73 @@ int move_making_check(){
     printf("%s\n", unload_position(&pos));
     //printf("r1bqkbnr/ppp1p1pp/2n5/3pPp2/8/8/PPPPNPPP/RNBQKB1R w KQkq d6 0 4");
     return 0;
+}
+
+int perft_test(){
+    Position pos;
+    load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", &pos);
+    init_zobrist(); init_attack_tables(); precompute_edgedists();// Undo u;
+    //make_move(&pos, 0xac3, &u);
+
+    printf("FEN : %s\n", unload_position(&pos));
+    for (int i=1; i<6; i++){
+        printf("Depth %d : %llu\n", i, perft(&pos, i));
+    } return 0;
+    return 0;
+}
+
+uint64_t perft(Position *pos, int depth){
+    MoveList mv; mv.count=0;
+    if (depth==0) return 1ULL;
+    Undo undid; uint64_t nodes = 0ULL;
+
+    generate_moves(pos, &mv);
+    for (int i=0; i<mv.count; i++){
+        make_move(pos, mv.moves[i], &undid);
+        nodes += perft(pos, depth-1);
+        unmake_move(pos, mv.moves[i], &undid);
+    }
+    return nodes;
+}
+
+void perft_divide(Position *pos, int depth) {
+    MoveList mv; 
+    mv.count = 0;
+    generate_moves(pos, &mv);
+
+    uint64_t total = 0ULL;
+
+    Undo undid;
+
+    for (int i = 0; i < mv.count; i++) {
+        make_move(pos, mv.moves[i], &undid);
+        uint64_t nodes = perft(pos, depth - 1);
+        unmake_move(pos, mv.moves[i], &undid);
+
+        // Print move in algebraic notation
+        int from = MOVE_FROM(mv.moves[i]);
+        int to   = MOVE_TO(mv.moves[i]);
+        int flag = MOVE_FLAGS(mv.moves[i]);
+        char move_str[6];
+        sprintf(move_str, "%c%c%c%c",
+            'a' + (from % 8),
+            '1' + (from / 8),
+            'a' + (to % 8),
+            '1' + (to / 8)
+        );
+        // Add promotion piece if any
+        if ((piece_at(from, pos)%6==0) && (to/8==7 || to/8==0)){
+            if (flag == 0) move_str[4] = 'q';
+            else if (flag == 1) move_str[4] = 'r';
+            else if (flag == 2) move_str[4] = 'b';
+            else if (flag == 3) move_str[4] = 'n';
+            else move_str[4] = '\0';
+        }
+        else move_str[4] = '\0';
+
+        printf("%s: %llu\n", move_str, nodes);
+        total += nodes;
+    }
+
+    printf("Total nodes at depth %d: %llu\n", depth, total);
 }

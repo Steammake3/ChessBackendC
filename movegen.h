@@ -14,19 +14,32 @@ typedef struct {
     uint16_t count;
 } MoveList;
 
+typedef struct {
+    uint64_t pinned;
+    uint64_t checkers;
+    uint64_t block_mask;
+    uint64_t pin_dir[64];
+    uint64_t enemy_attack_maps;
+} LegalData;
+
+void init_attack_tables();
+
+bool ep_is_legal(Position *pos, uint8_t from, uint8_t ep_to);
+
 void generate_moves(Position *pos, MoveList *moves);
 
 void move_list_concat(MoveList *dest, MoveList *src);
 
-void generate_sliding_moves(Position *pos, MoveList *moves);
+void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals);
 
-void generate_pawn_moves(Position *pos, MoveList *moves);
+void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals);
 
-void generate_K_N_moves(Position *pos, MoveList *moves);
+void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals);
 
-bool is_in_check(Position *pos);
+void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals);
 
 static inline int pop_lsb(uint64_t *b) {
+    //if (*b == 0) return NO_SQ;
     int sq = __builtin_ctzll(*b);
     *b &= *b - 1;
     return sq;
@@ -40,9 +53,10 @@ uint64_t generate_pawn_attacks(uint8_t sq, int side);
 uint64_t generate_rook_attacks(uint8_t sq, uint64_t occ);
 uint64_t generate_bishop_attacks(uint8_t sq, uint64_t occ);
 
-bool square_attacked(Position *pos, int sq, int by_side);
+bool square_attacked(int sq, LegalData *legals);
+uint64_t compute_attack_map(Position *pos, int by_side);
 
 //Pin & Checks
-void compute_pins(Position *pos, uint64_t *pinned, uint64_t pin_dir[64]);
+void compute_pins_n_checks(Position *pos, LegalData *legals);
 
 #endif

@@ -34,9 +34,17 @@ void init_attack_tables() {
     }
 }
 
+bool ep_is_legal(Position *pos, uint8_t from, uint8_t ep_to){
+    Undo undid; LegalData legs;
+    make_move(pos, MAKE_MOVE(from, ep_to, 0), &undid);
+    compute_pins_n_checks(pos, &legs);
+    unmake_move(pos, MAKE_MOVE(from, ep_to, 0), &undid);
+    return legs.checkers==0;
+}
+
 uint64_t generate_knight_attacks(uint8_t sq) {
     //ChatGPT Generated, I couldn't care less, it's free optimization
-    uint64_t b = 1ULL << sq;
+    uint64_t b = BBd(sq);
 
     uint64_t l1 = (b >> 1) & 0x7f7f7f7f7f7f7f7fULL;
     uint64_t l2 = (b >> 2) & 0x3f3f3f3f3f3f3f3fULL;
@@ -51,7 +59,7 @@ uint64_t generate_knight_attacks(uint8_t sq) {
 
 uint64_t generate_pawn_attacks(uint8_t sq, int side) {
     //ChatGPT again
-    uint64_t b = 1ULL << sq;
+    uint64_t b = BBd(sq);
 
     if (side == WHITE) {
         return ((b << 7) & NOT_H_FILE) |
@@ -63,7 +71,7 @@ uint64_t generate_pawn_attacks(uint8_t sq, int side) {
 }
 
 uint64_t generate_king_attacks(uint8_t sq) {
-    uint64_t b = 1ULL << sq;
+    uint64_t b = BBd(sq);
 
     uint64_t attacks =
         (b & NOT_A_FILE) >> 1 |
@@ -85,28 +93,28 @@ uint64_t generate_rook_attacks(uint8_t sq, uint64_t occ) {
     // North
     for (int rr = r + 1; rr <= 7; rr++) {
         int s = rr * 8 + f;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
     // South
     for (int rr = r - 1; rr >= 0; rr--) {
         int s = rr * 8 + f;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
     // East
     for (int ff = f + 1; ff <= 7; ff++) {
         int s = r * 8 + ff;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
     // West
     for (int ff = f - 1; ff >= 0; ff--) {
         int s = r * 8 + ff;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
@@ -122,28 +130,28 @@ uint64_t generate_bishop_attacks(uint8_t sq, uint64_t occ) {
     // NE
     for (int rr = r + 1, ff = f + 1; rr <= 7 && ff <= 7; rr++, ff++) {
         int s = rr * 8 + ff;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
     // NW
     for (int rr = r + 1, ff = f - 1; rr <= 7 && ff >= 0; rr++, ff--) {
         int s = rr * 8 + ff;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
     // SE
     for (int rr = r - 1, ff = f + 1; rr >= 0 && ff <= 7; rr--, ff++) {
         int s = rr * 8 + ff;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
     // SW
     for (int rr = r - 1, ff = f - 1; rr >= 0 && ff >= 0; rr--, ff--) {
         int s = rr * 8 + ff;
-        uint64_t bit = 1ULL << s;
+        uint64_t bit = BBd(s);
         attacks |= bit;
         if (occ & bit) break;
     }
@@ -151,10 +159,10 @@ uint64_t generate_bishop_attacks(uint8_t sq, uint64_t occ) {
     return attacks;
 }
 
-void compute_pins_n_checks(Position *pos, uint64_t *pinned, uint64_t *checkers, uint64_t *block_mask, uint64_t pin_dir[64]){
-    *pinned = 0ULL;
-    *checkers = 0ULL;
-    memset(pin_dir, 0xFF, sizeof(pin_dir));
+void compute_pins_n_checks(Position *pos, LegalData *legals){
+    legals->pinned = 0ULL;
+    legals->checkers = 0ULL;
+    memset(legals->pin_dir, 0xFF, sizeof(legals->pin_dir));
 
     bool side = pos->side_to_move;
     bool enemy = side^1;
@@ -168,25 +176,46 @@ void compute_pins_n_checks(Position *pos, uint64_t *pinned, uint64_t *checkers, 
 
     for (uint8_t dir=0; dir<8; dir++){
         uint8_t candidate = NO_SQ;
-        uint64_t rn_pin = 0ULL;
+
+        int prev_file = king % 8;
         for (uint8_t extent=1; extent<=EDGEDISTS[king][dir]; extent++){
             uint8_t cur_sq = king + DIRECTIONS[dir]*extent;
             uint64_t bb = BBd(cur_sq);
-            rn_pin |= bb;
+            int cur_file = cur_sq % 8;
+            if (ABS(cur_file - prev_file) > 1) break; // prevent wraparound
+            prev_file = cur_file;
+
             if (bb&pos->occupancies[side]){ //Friend ;)
                 if (candidate==NO_SQ) candidate = cur_sq;
                 else break;
             } else if (bb&pos->occupancies[enemy]){ //Fiend >:]
 
                 if (dir<4 && (bb&(e_queens|e_bishops))) { //Diag case
-                    if (candidate==NO_SQ) *checkers |= bb;
+                    if (candidate==NO_SQ) legals->checkers |= bb;
                     else {
-                        *pinned |= BBd(candidate); pin_dir[candidate] = rn_pin;
+                        legals->pinned |= BBd(candidate);
+
+                        uint64_t ray = 0ULL;
+                        for (int e = 1; e <= extent; e++){
+                            int sq = king + DIRECTIONS[dir]*e;
+                            ray |= BBd(sq);
+                        }
+
+                        legals->pin_dir[candidate] = ray;
                     }
+                
                 } else if (dir>=4 && (bb&(e_queens|e_rooks))){ //manhattan
-                    if (candidate==NO_SQ) *checkers |= bb;
+                    if (candidate==NO_SQ) legals->checkers |= bb;
                     else {
-                        *pinned |= BBd(candidate); pin_dir[candidate] = rn_pin;
+                        legals->pinned |= BBd(candidate);
+
+                        uint64_t ray = 0ULL;
+                        for (int e = 1; e <= extent; e++){
+                            int sq = king + DIRECTIONS[dir]*e;
+                            ray |= BBd(sq);
+                        }
+
+                        legals->pin_dir[candidate] = ray;
                     }
                 }
                 break;
@@ -195,38 +224,307 @@ void compute_pins_n_checks(Position *pos, uint64_t *pinned, uint64_t *checkers, 
     }
 
     uint64_t e_knights = pos->bitboards[enemy?BN:WN];
-    *checkers |= knight_attacks[king]&e_knights;
+    legals->checkers |= knight_attacks[king]&e_knights;
 
     uint64_t e_pawns = pos->bitboards[enemy?BP:WP];
-    *checkers |= pawn_attacks[side][king]&e_pawns;
+    legals->checkers |= pawn_attacks[side][king]&e_pawns;
 
-    *block_mask = 0ULL;
+    legals->block_mask = 0ULL;
 
-    uint8_t checker_sq;
-    if (__builtin_popcountll(*checkers) == 1) {
-        checker_sq = __builtin_ctzll(*checkers);
-        if (*checkers & (e_pawns|e_knights)){
-            *block_mask = *checkers;
+    if (__builtin_popcountll(legals->checkers) == 1) {
+        int checker_sq = __builtin_ctzll(legals->checkers);
+
+        //If the checker is a knight or pawn, only the checker square is relevant
+        if (legals->checkers & (e_pawns | e_knights)) {
+            legals->block_mask = legals->checkers; //can only capture the checker
         } else {
-            for (uint8_t dir=0; dir<8; dir++) {
-                for (uint8_t dist=1; dist<=EDGEDISTS[king][dir]; dist++) {
-                    uint8_t sq = king + DIRECTIONS[dir]*dist;
-                    *block_mask |= BBd(sq);
-                    if (sq == checker_sq) break; // found the checker along this ray
-                    if (BBd(sq) & pos->occupancies[BOTH]) break; // blocked by something else
+            // sliding piece: rook, bishop, queen
+            // calculate ray from king to checker
+            int dir = -1;
+
+            // find the direction of the checker relative to the king
+            for (int d = 0; d < 8; d++) {
+                for (int dist = 1; dist <= EDGEDISTS[king][d]; dist++) {
+                    int sq = king + DIRECTIONS[d] * dist;
+                    if (sq == checker_sq) {
+                        dir = d;
+                        break;
+                    }
+                    //if (BBd(sq) & pos->occupancies[BOTH]) break; // blocked
                 }
-                if (*block_mask & *checkers) break; // ray found
+                if (dir != -1) break;
+            }
+
+            if (dir != -1) {
+                // build the block mask along the ray
+                for (int dist = 1; dist <= EDGEDISTS[king][dir]; dist++) {
+                    int sq = king + DIRECTIONS[dir] * dist;
+                    legals->block_mask |= BBd(sq);
+                    if (sq == checker_sq) break; // stop at the checker
+                    if (BBd(sq) & pos->occupancies[BOTH]) break; // blocked by piece
+                }
+            }
+        }
+    }
+    legals->enemy_attack_maps = compute_attack_map(pos, enemy);
+}
+
+void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
+    bool side = pos->side_to_move;
+    uint64_t pawns = pos->bitboards[6*side + WP];
+    uint64_t occ = pos->occupancies[BOTH];
+    uint64_t enemy_occ = pos->occupancies[side^1];
+
+    int forward = side ? -8 : 8;
+    int start_rank = side ? 6 : 1;
+
+    while (pawns){
+        int from = pop_lsb(&pawns);
+        uint64_t from_bb = BBd(from);
+
+        // Determine the allowed ray for pinned pawns
+        uint64_t pin_mask = (legals->pinned & from_bb) ? legals->pin_dir[from] : ~0ULL;
+
+        // Single push
+        int to = from + forward;
+        uint64_t to_bb = BBd(to);
+        if (!(occ & to_bb) && (to_bb & pin_mask) &&
+            (!legals->checkers || (to_bb & legals->block_mask))) {
+            
+            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+            if (to/8==(side?0:7)){ //Promo
+                moves->moves[moves->count++] = MAKE_MOVE(from, to, 1);
+                moves->moves[moves->count++] = MAKE_MOVE(from, to, 2);
+                moves->moves[moves->count++] = MAKE_MOVE(from, to, 3);
+            }
+
+            // Double push
+            int dbl = from + 2*forward;
+            uint64_t dbl_bb = BBd(dbl);
+            if ((from/8 == start_rank) && !(occ & dbl_bb) &&
+                (dbl_bb & pin_mask) &&
+                (!legals->checkers || ((to_bb & legals->block_mask) && (dbl_bb & legals->block_mask)))) {
+                moves->moves[moves->count++] = MAKE_MOVE(from, dbl, 0);
+            }
+        }
+
+        // Captures
+        uint64_t attacks = pawn_attacks[side][from] & enemy_occ;
+        while (attacks){
+            int cap_to = pop_lsb(&attacks);
+            uint64_t cap_bb = BBd(cap_to);
+
+            // Respect pin and check
+            if ((!(legals->pinned & from_bb) || (cap_bb & pin_mask)) &&
+                (!legals->checkers || (cap_bb & legals->block_mask))) {
+                moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 0);
+                if (to/8==(side?0:7)){ //Promo
+                    moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 1);
+                    moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 2);
+                    moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 3);
+                }
+            }
+        }
+
+        // En passant
+        if (pos->en_passant != NO_SQ){
+            int ep_to = pos->en_passant;
+            uint64_t ep_bb = BBd(ep_to);
+
+            // Is this pawn able to capture EP?
+            if (pawn_attacks[side][from] & ep_bb){
+                // Must simulate EP legality (king not left in check)
+                if (ep_is_legal(pos, from, ep_to)) {
+                    moves->moves[moves->count++] = MAKE_MOVE(from, ep_to, 0);
+                }
             }
         }
     }
 }
 
-void generate_pawn_moves(Position *pos, MoveList *moves){
-    uint64_t pawns = pos->bitboards[6*pos->side_to_move+WP];
-    while (pawns){
-        int cpawn_sq = pop_lsb(&pawns);
-        int sing_push = cpawn_sq + (pos->side_to_move ? -8 : 8);
-        int doub_push = cpawn_sq + (pos->side_to_move ? -16 : 16);
-        if (!(pos->occupancies[BOTH]&sing_push)) moves->moves[moves->count++] = 4;//TODO
+void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals){
+    bool side = pos->side_to_move;
+    uint64_t knights = pos->bitboards[side?BN:WN];
+
+    while (knights){
+        uint8_t knight = pop_lsb(&knights);
+        uint64_t k_bb = BBd(knight);
+        uint64_t moves_rn = knight_attacks[knight] & ~pos->occupancies[side];
+
+        if (legals->pinned & k_bb) continue;
+        while (moves_rn) {
+            uint8_t move_rn = pop_lsb(&moves_rn);
+
+            if (legals->checkers && !(BBd(move_rn) & legals->block_mask)) continue;
+            moves->moves[moves->count++] = MAKE_MOVE(knight, move_rn, 0);
+        }
     }
+}
+
+void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals){
+    bool side = pos->side_to_move;
+    uint64_t king = __builtin_ctzll(pos->bitboards[side?BK:WK]);
+    uint64_t k_bb = pos->bitboards[side?BK:WK];
+    uint64_t moves_rn = king_attacks[king] & ~pos->occupancies[side];
+    uint8_t castles = (pos->castling_rights >> ((side^1)*2)) & 0b11;
+
+    //General
+    while (moves_rn) {
+        uint8_t move_rn = pop_lsb(&moves_rn);
+
+        if (square_attacked(move_rn, legals)) continue;
+        moves->moves[moves->count++] = MAKE_MOVE(king, move_rn, 0);
+    }
+    //Castling (ChatGPT)
+    uint64_t occ = pos->occupancies[BOTH];
+
+    if (side == WHITE) {
+
+        // Kingside
+        if (pos->castling_rights & 8) {
+            if (!(occ & (BBd(5) | BBd(6))) &&
+                !(legals->enemy_attack_maps & (BBd(4) | BBd(5) | BBd(6))))
+                moves->moves[moves->count++] = MAKE_MOVE(4,6,0);
+        }
+
+        // Queenside
+        if (pos->castling_rights & 4) {
+            if (!(occ & (BBd(1) | BBd(2) | BBd(3))) &&
+                !(legals->enemy_attack_maps & (BBd(4) | BBd(3) | BBd(2))))
+                moves->moves[moves->count++] = MAKE_MOVE(4,2,0);
+        }
+
+    } else {
+
+        // Kingside
+        if (pos->castling_rights & 2) {
+            if (!(occ & (BBd(61) | BBd(62))) &&
+                !(legals->enemy_attack_maps & (BBd(60) | BBd(61) | BBd(62))))
+                moves->moves[moves->count++] = MAKE_MOVE(60,62,0);
+        }
+
+        // Queenside
+        if (pos->castling_rights & 1) {
+            if (!(occ & (BBd(57) | BBd(58) | BBd(59))) &&
+                !(legals->enemy_attack_maps & (BBd(60) | BBd(59) | BBd(58))))
+                moves->moves[moves->count++] = MAKE_MOVE(60,58,0);
+        }
+
+    }
+}
+
+void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals){
+    bool side = pos->side_to_move;
+    uint64_t occ = pos->occupancies[BOTH];
+    uint64_t enemy_occ = pos->occupancies[side^1];
+
+    // --- ROOKS ---
+    uint64_t rooks = pos->bitboards[side ? BR : WR];
+    while (rooks){
+        int from = pop_lsb(&rooks);
+        uint64_t attacks = generate_rook_attacks(from, occ) & ~pos->occupancies[side];
+
+        // respect pins and checks
+        uint64_t from_bb = BBd(from);
+        uint64_t pin_mask = (legals->pinned & from_bb) ? legals->pin_dir[from] : ~0ULL;
+        attacks &= pin_mask;
+        if (legals->checkers) attacks &= legals->block_mask;
+
+        while (attacks){
+            int to = pop_lsb(&attacks);
+            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+        }
+    }
+
+    // --- BISHOPS ---
+    uint64_t bishops = pos->bitboards[side ? BB : WB];
+    while (bishops){
+        int from = pop_lsb(&bishops);
+        uint64_t attacks = generate_bishop_attacks(from, occ) & ~pos->occupancies[side];
+
+        uint64_t from_bb = BBd(from);
+        uint64_t pin_mask = (legals->pinned & from_bb) ? legals->pin_dir[from] : ~0ULL;
+        attacks &= pin_mask;
+        if (legals->checkers) attacks &= legals->block_mask;
+
+        while (attacks){
+            int to = pop_lsb(&attacks);
+            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+        }
+    }
+
+    // --- QUEENS ---
+    uint64_t queens = pos->bitboards[side ? BQ : WQ];
+    while (queens){
+        int from = pop_lsb(&queens);
+        uint64_t attacks = (generate_rook_attacks(from, occ) | generate_bishop_attacks(from, occ)) & ~pos->occupancies[side];
+
+        uint64_t from_bb = BBd(from);
+        uint64_t pin_mask = (legals->pinned & from_bb) ? legals->pin_dir[from] : ~0ULL;
+        attacks &= pin_mask;
+        if (legals->checkers) attacks &= legals->block_mask;
+
+        while (attacks){
+            int to = pop_lsb(&attacks);
+            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+        }
+    }
+}
+
+uint64_t compute_attack_map(Position *pos, int by_side){
+    uint64_t pawns = pos->bitboards[by_side?BP:WP];
+    uint64_t knights = pos->bitboards[by_side?BN:WN];
+    uint64_t king = pos->bitboards[by_side?BK:WK];
+    uint64_t rooks = pos->bitboards[by_side?BR:WR];
+    uint64_t bishops = pos->bitboards[by_side?BB:WB];
+    uint64_t queens = pos->bitboards[by_side?BQ:WQ];
+    uint64_t attack_mask = 0ULL;
+    uint64_t occ = pos->occupancies[BOTH];
+
+    uint8_t cur_sq = NO_SQ;
+
+    while (pawns) {
+        cur_sq = pop_lsb(&pawns);
+        attack_mask |= pawn_attacks[by_side][cur_sq];
+    } while (knights) {
+        cur_sq = pop_lsb(&knights);
+        attack_mask |= knight_attacks[cur_sq];
+    } attack_mask |= king_attacks[pop_lsb(&king)];
+
+    while (rooks){
+        cur_sq = pop_lsb(&rooks);
+        attack_mask |= generate_rook_attacks(cur_sq, occ);
+    } while (bishops){
+        cur_sq = pop_lsb(&bishops);
+        attack_mask |= generate_bishop_attacks(cur_sq, occ);
+    } while (queens){
+        cur_sq = pop_lsb(&queens);
+        attack_mask |= generate_rook_attacks(cur_sq, occ) | generate_bishop_attacks(cur_sq, occ);
+    }
+
+    return attack_mask;
+}
+
+bool square_attacked(int sq, LegalData *legals){
+    return (BBd(sq)&legals->enemy_attack_maps)!=0;
+}
+
+void generate_moves(Position *pos, MoveList *moves){
+    LegalData legals;
+    compute_pins_n_checks(pos, &legals);
+
+    generate_king_moves(pos, moves, &legals);
+    if (__builtin_popcountll(legals.checkers) == 2) return;
+    generate_pawn_moves(pos, moves, &legals);
+    generate_knight_moves(pos, moves, &legals);
+    generate_sliding_moves(pos, moves, &legals);
+
+    /* uint64_t p = legals.pinned;
+    while (p) {
+        int sq = pop_lsb(&p);
+        printf("Pinned: %d\n", sq);
+    }
+    printf("King: %d\n", __builtin_ctzll(pos->bitboards[pos->side_to_move?BK:WK]));
+    printf("Pinned mask: %llx\n", legals.pinned);
+    */
 }

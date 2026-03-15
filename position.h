@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #define NO_SQ 64
 #define WHITE 0
@@ -14,7 +15,7 @@
 #define MOVE_FLAGS(m)  (((m) >> 12) & 0xF)   // top 4 bits
 
 #define MAKE_MOVE(f,t,fl)  (uint16_t) ((f) | ((t)<<6) | ((fl)<<12))
-#define ABS(a) ((a>0) ? a : -a)
+#define ABS(a) (((a)>0) ? (a) : (-(a)))
 #define MIN(a,b) (a<b?a:b)
 #define BBd(sq) (1ULL<<(sq))
 
@@ -45,7 +46,7 @@ typedef struct {
 
 extern uint8_t CHEBYSHEV[64][64];
 extern uint8_t EDGEDISTS[64][8];
-extern const int8_t DIRECTIONS[8] = {-9,-7,7,9,-8,-1,1,8}; 
+extern const int8_t DIRECTIONS[8]; 
 
 void add_piece(int index, Position *position, char piece);
 
@@ -62,4 +63,6 @@ void make_move(Position *position, uint16_t move, Undo *undo);
 void unmake_move(Position *position, uint16_t move, Undo *undo);
 
 void precompute_chebyshev();
+
+void precompute_edgedists();
 #endif
