@@ -24,7 +24,7 @@ typedef struct {
 
 void init_attack_tables();
 
-bool ep_is_legal(Position *pos, uint8_t from, uint8_t ep_to);
+bool ep_is_legal(Position *pos, int from, int ep_to);
 
 void generate_moves(Position *pos, MoveList *moves);
 
@@ -54,7 +54,7 @@ uint64_t generate_rook_attacks(uint8_t sq, uint64_t occ);
 uint64_t generate_bishop_attacks(uint8_t sq, uint64_t occ);
 
 bool square_attacked(int sq, LegalData *legals);
-uint64_t compute_attack_map(Position *pos, int by_side);
+uint64_t compute_attack_map(Position *pos, int by_side, uint64_t exclude);
 
 //Pin & Checks
 void compute_pins_n_checks(Position *pos, LegalData *legals);

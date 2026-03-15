@@ -34,7 +34,7 @@ void init_attack_tables() {
     }
 }
 
-bool ep_is_legal(Position *pos, uint8_t from, uint8_t ep_to){
+bool ep_is_legal(Position *pos, int from, int ep_to){
     Undo undid; LegalData legs;
     make_move(pos, MAKE_MOVE(from, ep_to, 0), &undid);
     compute_pins_n_checks(pos, &legs);
@@ -262,7 +262,7 @@ void compute_pins_n_checks(Position *pos, LegalData *legals){
             }
         }
     }
-    legals->enemy_attack_maps = compute_attack_map(pos, enemy);
+    legals->enemy_attack_maps = compute_attack_map(pos, enemy, king_bb);
 }
 
 void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
@@ -294,14 +294,14 @@ void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
                 moves->moves[moves->count++] = MAKE_MOVE(from, to, 3);
             }
 
-            // Double push
-            int dbl = from + 2*forward;
-            uint64_t dbl_bb = BBd(dbl);
-            if ((from/8 == start_rank) && !(occ & dbl_bb) &&
-                (dbl_bb & pin_mask) &&
-                (!legals->checkers || ((to_bb & legals->block_mask) && (dbl_bb & legals->block_mask)))) {
-                moves->moves[moves->count++] = MAKE_MOVE(from, dbl, 0);
-            }
+        }
+        // Double push
+        int dbl = from + 2*forward;
+        uint64_t dbl_bb = BBd(dbl);
+        if ((from/8 == start_rank) && !(occ & dbl_bb) && !(occ & to_bb) &&
+            (dbl_bb & pin_mask) &&
+            (!legals->checkers || (dbl_bb & legals->block_mask))) {
+            moves->moves[moves->count++] = MAKE_MOVE(from, dbl, 0);
         }
 
         // Captures
@@ -328,7 +328,8 @@ void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
             uint64_t ep_bb = BBd(ep_to);
 
             // Is this pawn able to capture EP?
-            if (pawn_attacks[side][from] & ep_bb){
+            if ((pawn_attacks[side][from] & ep_bb) &&
+                (!(legals->pinned && from_bb) || (ep_bb & pin_mask))){
                 // Must simulate EP legality (king not left in check)
                 if (ep_is_legal(pos, from, ep_to)) {
                     moves->moves[moves->count++] = MAKE_MOVE(from, ep_to, 0);
@@ -467,15 +468,15 @@ void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals){
     }
 }
 
-uint64_t compute_attack_map(Position *pos, int by_side){
-    uint64_t pawns = pos->bitboards[by_side?BP:WP];
-    uint64_t knights = pos->bitboards[by_side?BN:WN];
-    uint64_t king = pos->bitboards[by_side?BK:WK];
-    uint64_t rooks = pos->bitboards[by_side?BR:WR];
-    uint64_t bishops = pos->bitboards[by_side?BB:WB];
-    uint64_t queens = pos->bitboards[by_side?BQ:WQ];
+uint64_t compute_attack_map(Position *pos, int by_side, uint64_t exclude){
+    uint64_t pawns = pos->bitboards[by_side?BP:WP]&~exclude;
+    uint64_t knights = pos->bitboards[by_side?BN:WN]&~exclude;
+    uint64_t king = pos->bitboards[by_side?BK:WK]&~exclude;
+    uint64_t rooks = pos->bitboards[by_side?BR:WR]&~exclude;
+    uint64_t bishops = pos->bitboards[by_side?BB:WB]&~exclude;
+    uint64_t queens = pos->bitboards[by_side?BQ:WQ]&~exclude;
     uint64_t attack_mask = 0ULL;
-    uint64_t occ = pos->occupancies[BOTH];
+    uint64_t occ = pos->occupancies[BOTH]&~exclude;
 
     uint8_t cur_sq = NO_SQ;
 
