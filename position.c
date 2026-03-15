@@ -370,10 +370,10 @@ void precompute_edgedists(){
             uint8_t n=7-r, s=r, e=7-f, w=f;
             uint8_t ne=MIN(n,e), nw=MIN(n,w), se=MIN(s,e), sw=MIN(s,w);
             //GOOOOOOOOOOOOOOOO!
-            EDGEDISTS[sq][0] = se;
-            EDGEDISTS[sq][1] = sw;
-            EDGEDISTS[sq][2] = ne;
-            EDGEDISTS[sq][3] = nw;
+            EDGEDISTS[sq][0] = sw;
+            EDGEDISTS[sq][1] = se;
+            EDGEDISTS[sq][2] = nw;
+            EDGEDISTS[sq][3] = ne;
             EDGEDISTS[sq][4] = s;
             EDGEDISTS[sq][5] = w;
             EDGEDISTS[sq][6] = e;

@@ -177,13 +177,9 @@ void compute_pins_n_checks(Position *pos, LegalData *legals){
     for (uint8_t dir=0; dir<8; dir++){
         uint8_t candidate = NO_SQ;
 
-        int prev_file = king % 8;
         for (uint8_t extent=1; extent<=EDGEDISTS[king][dir]; extent++){
             uint8_t cur_sq = king + DIRECTIONS[dir]*extent;
             uint64_t bb = BBd(cur_sq);
-            int cur_file = cur_sq % 8;
-            if (ABS(cur_file - prev_file) > 1) break; // prevent wraparound
-            prev_file = cur_file;
 
             if (bb&pos->occupancies[side]){ //Friend ;)
                 if (candidate==NO_SQ) candidate = cur_sq;
