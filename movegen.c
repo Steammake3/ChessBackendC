@@ -507,15 +507,14 @@ bool square_attacked(int sq, LegalData *legals){
     return (BBd(sq)&legals->enemy_attack_maps)!=0;
 }
 
-void generate_moves(Position *pos, MoveList *moves){
-    LegalData legals;
-    compute_pins_n_checks(pos, &legals);
+void generate_moves(Position *pos, MoveList *moves, LegalData *legals){
+    compute_pins_n_checks(pos, legals);
 
-    generate_king_moves(pos, moves, &legals);
-    if (__builtin_popcountll(legals.checkers) == 2) return;
-    generate_pawn_moves(pos, moves, &legals);
-    generate_knight_moves(pos, moves, &legals);
-    generate_sliding_moves(pos, moves, &legals);
+    generate_king_moves(pos, moves, legals);
+    if (__builtin_popcountll(legals->checkers) == 2) return;
+    generate_pawn_moves(pos, moves, legals);
+    generate_knight_moves(pos, moves, legals);
+    generate_sliding_moves(pos, moves, legals);
 
     /* uint64_t p = legals.pinned;
     while (p) {

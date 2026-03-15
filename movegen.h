@@ -26,7 +26,7 @@ void init_attack_tables();
 
 bool ep_is_legal(Position *pos, int from, int ep_to);
 
-void generate_moves(Position *pos, MoveList *moves);
+void generate_moves(Position *pos, MoveList *moves, LegalData *legals);
 
 void move_list_concat(MoveList *dest, MoveList *src);
 
