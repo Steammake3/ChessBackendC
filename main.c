@@ -2,6 +2,8 @@
 #include <time.h>
 #include "main.h"
 
+Position game;
+
 int main(int argc, char *argv[]){
     if (argc!=2){
         printf("USAGE - BOT time_control"); return 1;
@@ -12,7 +14,7 @@ int main(int argc, char *argv[]){
         return 1;
     }
     char taken[6];
-    Position game; Undo undid;
+    Undo undid;
     uint16_t chosenmove = 0;
     load_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &game);
     while (0xA34){
@@ -58,6 +60,17 @@ char* move2str(uint16_t move){
     return move_str;
 }
 
-uint16_t best_move(int time_control){
-    return 0; //TODO
+uint16_t best_move(float time_control){
+    clock_t start_time = clock();
+    uint16_t best_move = 0;
+
+    while (0xA34){
+        //Invoke search, TODO
+
+        float elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
+        if (elapsed_time >= time_control){
+            break;
+        }
+    }
+    return best_move;
 }
