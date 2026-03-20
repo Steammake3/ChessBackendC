@@ -6,6 +6,6 @@
 
 uint16_t str2move(const char move[]);
 char* move2str(uint16_t move);
-uint16_t best_move(float ime_control);
+uint16_t best_move(float time_control);
 
 #endif

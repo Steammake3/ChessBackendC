@@ -65,4 +65,6 @@ void unmake_move(Position *position, uint16_t move, Undo *undo);
 void precompute_chebyshev();
 
 void precompute_edgedists();
+
+char* ascii_repr(Position *pos);
 #endif

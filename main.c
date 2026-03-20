@@ -3,16 +3,22 @@
 #include "main.h"
 
 Position game;
+const char *info = "----\nHello! Use the following commands -> \n"
+    "\ta1a1 - makes a move from a1 to a1 (obviously other moves like e2e4 also work)\n"
+    "\t/d - prints ASCII repr of board (WHITE, black)\n"
+    "\tQ - quits game\n"
+    "\t/log - prints a list of all moves played so far\n\n"; //TODO!!!!
 
 int main(int argc, char *argv[]){
     if (argc!=2){
         printf("USAGE - BOT time_control"); return 1;
     }
-    uint8_t control;
-    if (sscanf(argv[1], "%hhu", &control) != 1){
+    float control;
+    if (sscanf(argv[1], "%f", &control) != 1){
         printf("Invalid time control\n");
         return 1;
     }
+    printf("%s", info);
     char taken[6];
     Undo undid;
     uint16_t chosenmove = 0;
@@ -20,10 +26,18 @@ int main(int argc, char *argv[]){
     while (0xA34){
         scanf("%5s", taken);
         if (taken[0]=='Q') break;
-        make_move(&game, str2move(taken), &undid);
-        chosenmove = best_move(control);
-        printf("%s\n", move2str(chosenmove));
-        make_move(&game, chosenmove, &undid);
+        else if (taken[0]=='/'){
+            if (taken[1]=='d'){ //Print current position
+                printf("\n------------\n%s------------\n\n", ascii_repr(&game));
+            } else if (taken[1]=='l'){ //Print log TODO
+
+            }
+        } else {
+            make_move(&game, str2move(taken), &undid);
+            chosenmove = best_move(control);
+            printf("%s\n", move2str(chosenmove));
+            make_move(&game, chosenmove, &undid);
+        }
     }
     return 0;
 }

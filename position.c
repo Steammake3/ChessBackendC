@@ -381,3 +381,47 @@ void precompute_edgedists(){
         }
     }
 }
+
+char* ascii_repr(Position *pos){
+    static char printed[128];
+    memset(printed, '\0', sizeof(printed));
+    char* idx = printed;
+
+    const char key[14] = "PNBRQKpnbrqk.";
+    char pice = '\0';
+    char cur_sq = 56;
+    for (char rank=7; rank>=0; rank--){
+        for (char file=0; file<8; file++){
+            cur_sq = rank*8+file;
+            pice = piece_at(cur_sq, pos);
+            if (pice==NO_SQ) *idx++ = '.';
+            else if (pice >= 0 && pice < 12) *idx++ = key[pice];
+            else *idx++ = '?';
+        }
+        *idx++ = '\n';
+    }
+    *idx++ = '\n';
+    
+    if (pos->castling_rights == 0){
+        *idx++ = '-';
+    } else {
+        if (pos->castling_rights & 8) *idx++ = 'K';
+        if (pos->castling_rights & 4) *idx++ = 'Q';
+        if (pos->castling_rights & 2) *idx++ = 'k';
+        if (pos->castling_rights & 1) *idx++ = 'q';
+    }
+    *idx++ = ' ';
+
+    if (pos->en_passant == NO_SQ){ //EP
+        *idx++ = '-';
+    } else {
+        *idx++ = 'a' + (pos->en_passant % 8);
+        *idx++ = '1' + (pos->en_passant / 8);
+    }
+    *idx++ = ' ';
+
+    const char* stm = pos->side_to_move==BLACK ? "black\n" : "WHITE\n";
+    while (*stm) *idx++ = *stm++;
+    
+    return printed;
+}
