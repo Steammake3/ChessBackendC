@@ -10,7 +10,7 @@ const char *info = "----\nHello! Use the following commands -> \n"
     "\t/d - prints ASCII repr of board (WHITE, black)\n"
     "\tQ - quits game\n"
     "\t/undo - undoes previous move\n"
-    "\t/log - prints a list of all moves played so far\n\n"; //TODO!!!!
+    "\t/log - prints a list of all moves played so far\n\n";
 
 int main(int argc, char *argv[]){
     if (argc!=3){
@@ -20,7 +20,7 @@ int main(int argc, char *argv[]){
     float control;
     bool get_first_move;
     Undo undid[MAX_HISTORY]; memset(undid, '\0', sizeof(undid));
-    uint16_t moves[MAX_HISTORY]; memset(undid, '\0', sizeof(undid));
+    uint16_t moves[MAX_HISTORY]; memset(moves, '\0', sizeof(moves));
     uint16_t halfmove_ctr = 0;
 
     if (sscanf(argv[1], "%f", &control) != 1){ //Time control
@@ -40,22 +40,48 @@ int main(int argc, char *argv[]){
     char taken[6];
     uint16_t chosenmove = 0;
     load_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &game);
+    
+    if (get_first_move){
+        chosenmove = best_move(control);
+        printf("%s\n", move2str(chosenmove));
+        make_move(&game, chosenmove, &undid[halfmove_ctr]);
+        moves[halfmove_ctr] = chosenmove;
+        halfmove_ctr++;
+    }
+
     while (0xA34){
         scanf("%5s", taken);
-        if (taken[0]=='Q') break;
+        if (taken[0]=='Q' || taken[0]=='q') break;
+
         else if (taken[0]=='/'){
             if (taken[1]=='d'){ //Print current position
                 printf("\n------------\n%s------------\n\n", ascii_repr(&game));
-            } else if (taken[1]=='l'){ //Print log TODO
-
-            } else if (taken[1]=='u'){ //Undo TODO
-
+            } else if (taken[1]=='l'){ //Print log
+                for (int mv_ctr = 0; mv_ctr < halfmove_ctr; mv_ctr += 2){
+                    printf("%s", move2str(moves[mv_ctr]));
+                    if (mv_ctr + 1 < halfmove_ctr) {
+                        printf(" %s", move2str(moves[mv_ctr+1]));
+                    }
+                    printf("\n");
+                }
+            } else if (taken[1]=='u'){ //Undo
+                if (halfmove_ctr > 0) {
+                    halfmove_ctr--;
+                    printf("***Undid %s\n", move2str(moves[halfmove_ctr]));
+                    unmake_move(&game, moves[halfmove_ctr], &undid[halfmove_ctr]);
+                }
             }
-        } else {
-            make_move(&game, str2move(taken), &undid);
+
+        } else { //PlayBOT
+            make_move(&game, str2move(taken), &undid[halfmove_ctr]);
+            moves[halfmove_ctr] = str2move(taken);
+            halfmove_ctr++;
+
             chosenmove = best_move(control);
             printf("%s\n", move2str(chosenmove));
-            make_move(&game, chosenmove, &undid);
+            make_move(&game, chosenmove, &undid[halfmove_ctr]);
+            moves[halfmove_ctr] = chosenmove;
+            halfmove_ctr++;
         }
     }
     return 0;
@@ -96,6 +122,7 @@ char* move2str(uint16_t move){
 uint16_t best_move(float time_control){
     clock_t start_time = clock();
     uint16_t best_move = 0;
+    uint8_t depth = 1;
 
     while (0xA34){
         //Invoke search, TODO
@@ -104,6 +131,7 @@ uint16_t best_move(float time_control){
         if (elapsed_time >= time_control){
             break;
         }
+        depth++;
     }
     return best_move;
 }
