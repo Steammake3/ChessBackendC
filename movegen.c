@@ -267,7 +267,7 @@ void compute_pins_n_checks(Position *pos, LegalData *legals){
     legals->king_danger_map = compute_attack_map(pos, enemy, king_bb);
 }
 
-void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
+void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn){
     bool side = pos->side_to_move;
     uint64_t pawns = pos->bitboards[6*side + WP];
     uint64_t occ = pos->occupancies[BOTH];
@@ -289,12 +289,19 @@ void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
         if (!(occ & to_bb) && (to_bb & pin_mask) &&
             (!legals->checkers || (to_bb & legals->block_mask))) {
             
-            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
-            if (to/8==(side?0:7)){ //Promo
-                moves->moves[moves->count++] = MAKE_MOVE(from, to, 1);
-                moves->moves[moves->count++] = MAKE_MOVE(from, to, 2);
-                moves->moves[moves->count++] = MAKE_MOVE(from, to, 3);
-            }
+                if (qsn && to/8==(side?0:7)){
+                        moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+                        moves->moves[moves->count++] = MAKE_MOVE(from, to, 1);
+                        moves->moves[moves->count++] = MAKE_MOVE(from, to, 2);
+                        moves->moves[moves->count++] = MAKE_MOVE(from, to, 3);
+                } else {
+                    moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+                    if (to/8==(side?0:7)){ //Promo
+                        moves->moves[moves->count++] = MAKE_MOVE(from, to, 1);
+                        moves->moves[moves->count++] = MAKE_MOVE(from, to, 2);
+                        moves->moves[moves->count++] = MAKE_MOVE(from, to, 3);
+                    }
+                }
 
         }
         // Double push
@@ -302,7 +309,7 @@ void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
         uint64_t dbl_bb = BBd(dbl);
         if ((from/8 == start_rank) && !(occ & dbl_bb) && !(occ & to_bb) &&
             (dbl_bb & pin_mask) &&
-            (!legals->checkers || (dbl_bb & legals->block_mask))) {
+            (!legals->checkers || (dbl_bb & legals->block_mask)) && !qsn) {
             moves->moves[moves->count++] = MAKE_MOVE(from, dbl, 0);
         }
 
@@ -316,7 +323,7 @@ void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
             if ((!(legals->pinned & from_bb) || (cap_bb & pin_mask)) &&
                 (!legals->checkers || (cap_bb & legals->block_mask))) {
                 moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 0);
-                if (to/8==(side?0:7)){ //Promo
+                if (cap_to/8==(side?0:7)){ //Promo
                     moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 1);
                     moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 2);
                     moves->moves[moves->count++] = MAKE_MOVE(from, cap_to, 3);
@@ -331,7 +338,7 @@ void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
 
             // Is this pawn able to capture EP?
             if ((pawn_attacks[side][from] & ep_bb) &&
-                (!(legals->pinned && from_bb) || (ep_bb & pin_mask))){
+                (!(legals->pinned && from_bb) || (ep_bb & pin_mask)) && !qsn){
                 // Must simulate EP legality (king not left in check)
                 if (ep_is_legal(pos, from, ep_to)) {
                     moves->moves[moves->count++] = MAKE_MOVE(from, ep_to, 0);
@@ -341,7 +348,7 @@ void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
     }
 }
 
-void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals){
+void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn){
     bool side = pos->side_to_move;
     uint64_t knights = pos->bitboards[side?BN:WN];
 
@@ -355,12 +362,14 @@ void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals){
             uint8_t move_rn = pop_lsb(&moves_rn);
 
             if (legals->checkers && !(BBd(move_rn) & legals->block_mask)) continue;
-            moves->moves[moves->count++] = MAKE_MOVE(knight, move_rn, 0);
+            if (qsn){
+                if (pos->occupancies[side^1]&BBd(move_rn)) moves->moves[moves->count++] = MAKE_MOVE(knight, move_rn, 0);
+            } else moves->moves[moves->count++] = MAKE_MOVE(knight, move_rn, 0);
         }
     }
 }
 
-void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals){
+void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn){
     bool side = pos->side_to_move;
     uint64_t king = __builtin_ctzll(pos->bitboards[side?BK:WK]);
     uint64_t k_bb = pos->bitboards[side?BK:WK];
@@ -372,8 +381,12 @@ void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals){
         uint8_t move_rn = pop_lsb(&moves_rn);
 
         if (BBd(move_rn)&legals->king_danger_map) continue;
-        moves->moves[moves->count++] = MAKE_MOVE(king, move_rn, 0);
+        if (qsn){
+            if (pos->occupancies[side^1]&BBd(move_rn)) moves->moves[moves->count++] = MAKE_MOVE(king, move_rn, 0);
+        } else moves->moves[moves->count++] = MAKE_MOVE(king, move_rn, 0);
     }
+
+    if (qsn) return;
     //Castling (ChatGPT)
     uint64_t occ = pos->occupancies[BOTH];
 
@@ -412,7 +425,7 @@ void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals){
     }
 }
 
-void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals){
+void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn){
     bool side = pos->side_to_move;
     uint64_t occ = pos->occupancies[BOTH];
     uint64_t enemy_occ = pos->occupancies[side^1];
@@ -431,7 +444,9 @@ void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals){
 
         while (attacks){
             int to = pop_lsb(&attacks);
-            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+            if (qsn){
+                if (enemy_occ&BBd(to)) moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+            } else moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
         }
     }
 
@@ -448,7 +463,9 @@ void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals){
 
         while (attacks){
             int to = pop_lsb(&attacks);
-            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+            if (qsn){
+                if (enemy_occ&BBd(to)) moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+            } else moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
         }
     }
 
@@ -465,7 +482,9 @@ void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals){
 
         while (attacks){
             int to = pop_lsb(&attacks);
-            moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+            if (qsn){
+                if (enemy_occ&BBd(to)) moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
+            } else moves->moves[moves->count++] = MAKE_MOVE(from, to, 0);
         }
     }
 }
@@ -508,14 +527,16 @@ bool square_attacked(int sq, LegalData *legals){
     return (BBd(sq)&legals->enemy_attack_maps)!=0;
 }
 
-void generate_moves(Position *pos, MoveList *moves, LegalData *legals){
+void generate_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn){
     compute_pins_n_checks(pos, legals);
 
-    generate_king_moves(pos, moves, legals);
+    bool to_quiesence = qsn && (legals->checkers==0);
+
+    generate_king_moves(pos, moves, legals, to_quiesence);
     if (__builtin_popcountll(legals->checkers) == 2) return;
-    generate_pawn_moves(pos, moves, legals);
-    generate_knight_moves(pos, moves, legals);
-    generate_sliding_moves(pos, moves, legals);
+    generate_pawn_moves(pos, moves, legals, to_quiesence);
+    generate_knight_moves(pos, moves, legals, to_quiesence);
+    generate_sliding_moves(pos, moves, legals, to_quiesence);
 
     /* uint64_t p = legals.pinned;
     while (p) {

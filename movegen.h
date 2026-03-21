@@ -5,6 +5,9 @@
 #include <stdbool.h>
 #include "position.h"
 
+#define GEN_ALL 0
+#define GEN_QSN 1
+
 extern uint64_t knight_attacks[64];
 extern uint64_t king_attacks[64];
 extern uint64_t pawn_attacks[2][64]; // [side][square]
@@ -27,17 +30,15 @@ void init_attack_tables();
 
 bool ep_is_legal(Position *pos, int from, int ep_to);
 
-void generate_moves(Position *pos, MoveList *moves, LegalData *legals);
+void generate_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn);
 
-void move_list_concat(MoveList *dest, MoveList *src);
+void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn);
 
-void generate_sliding_moves(Position *pos, MoveList *moves, LegalData *legals);
+void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals , bool qsn);
 
-void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals);
+void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn);
 
-void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals);
-
-void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals);
+void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn);
 
 static inline int pop_lsb(uint64_t *b) {
     //if (*b == 0) return NO_SQ;
