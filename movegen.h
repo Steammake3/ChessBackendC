@@ -20,6 +20,7 @@ typedef struct {
     uint64_t block_mask;
     uint64_t pin_dir[64];
     uint64_t enemy_attack_maps;
+    uint64_t king_danger_map;
 } LegalData;
 
 void init_attack_tables();

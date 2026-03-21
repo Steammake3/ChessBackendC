@@ -263,7 +263,8 @@ void compute_pins_n_checks(Position *pos, LegalData *legals){
             }
         }
     }
-    legals->enemy_attack_maps = compute_attack_map(pos, enemy, king_bb);
+    legals->enemy_attack_maps = compute_attack_map(pos, enemy, 0ULL);
+    legals->king_danger_map = compute_attack_map(pos, enemy, king_bb);
 }
 
 void generate_pawn_moves(Position *pos, MoveList *moves, LegalData *legals){
@@ -370,7 +371,7 @@ void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals){
     while (moves_rn) {
         uint8_t move_rn = pop_lsb(&moves_rn);
 
-        if (square_attacked(move_rn, legals)) continue;
+        if (BBd(move_rn)&legals->king_danger_map) continue;
         moves->moves[moves->count++] = MAKE_MOVE(king, move_rn, 0);
     }
     //Castling (ChatGPT)
