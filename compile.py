@@ -14,7 +14,7 @@ def list_files_in_directory(path='.'):
 files = list_files_in_directory()
 
 try:
-    subprocess.run(["gcc", "-O1", *files, "-o", "bot.exe"], check=True, capture_output=True, text=True)
+    subprocess.run(["gcc", "-O0", "-g", *files, "-o", "bot.exe"], check=True, capture_output=True, text=True)
     print("Compilation succeeded.")
 except subprocess.CalledProcessError as e:
     print(f"Compilation failed with code {e.returncode}: {e.stderr}")

@@ -18,6 +18,7 @@
 #define ABS(a) (((a)>0) ? (a) : (-(a)))
 #define MIN(a,b) (a<b?a:b)
 #define BBd(sq) (1ULL<<(sq))
+#define PIECEtype(p) ((p)%6)
 
 typedef enum {
     WP, WN, WB, WR, WQ, WK, BP, BN, BB, BR, BQ, BK

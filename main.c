@@ -2,6 +2,7 @@
 #include <time.h>
 #include <string.h>
 #include "main.h"
+#include "search.h"
 #define MAX_HISTORY 1024
 
 Position game;
@@ -41,6 +42,8 @@ int main(int argc, char *argv[]){
     uint16_t chosenmove = 0;
     load_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &game);
     
+    tt_init(32); //FREE LATER
+
     if (get_first_move){
         chosenmove = best_move(control);
         printf("%s\n", move2str(chosenmove));
@@ -84,6 +87,7 @@ int main(int argc, char *argv[]){
             halfmove_ctr++;
         }
     }
+    tt_free();
     return 0;
 }
 
@@ -124,9 +128,11 @@ uint16_t best_move(float time_control){
     uint16_t best_move = 0;
     uint8_t depth = 1;
 
+    //Reached$ printf("Best move : %s\n", move2str(best_move));
     while (0xA34){
         //Invoke search, TODO
-
+        best_move = get_best_move(&game, depth); //Unreached$
+        printf("Best move : %s\n", move2str(best_move));
         float elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
         if (elapsed_time >= time_control){
             break;
