@@ -40,6 +40,7 @@ int main(int argc, char *argv[]){
     init_consts();
     char taken[6];
     uint16_t chosenmove = 0;
+    uint16_t playermove = 0;
     load_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &game);
     
     tt_init(32); //FREE LATER
@@ -76,11 +77,25 @@ int main(int argc, char *argv[]){
             }
 
         } else { //PlayBOT
-            make_move(&game, str2move(taken), &undid[halfmove_ctr]);
-            moves[halfmove_ctr] = str2move(taken);
+            //Check for check/stalemate (not the cleanest but it works)
+            chosenmove = best_move(-1.0);
+            if (chosenmove==0){ //Stalemate
+                printf("STALEMATE!!\n"); break;
+            } else if (chosenmove==UINT16_MAX){ //Checkmate
+                printf("CHECKMATE!! %s wins!\n", get_first_move ? "WHITE" : "black"); break;
+            }
+            //Do move
+            playermove = str2move(taken);
+            make_move(&game, playermove, &undid[halfmove_ctr]);
+            moves[halfmove_ctr] = playermove;
             halfmove_ctr++;
 
             chosenmove = best_move(control);
+            if (chosenmove==0){ //Stalemate
+                printf("STALEMATE!!\n"); break;
+            } else if (chosenmove==UINT16_MAX){ //Checkmate
+                printf("CHECKMATE!! %s wins!\n", get_first_move ? "black" : "WHITE"); break;
+            }
             printf("%s\n", move2str(chosenmove));
             make_move(&game, chosenmove, &undid[halfmove_ctr]);
             moves[halfmove_ctr] = chosenmove;
@@ -125,20 +140,21 @@ char* move2str(uint16_t move){
 
 uint16_t best_move(float time_control){
     clock_t start_time = clock();
-    uint16_t best_move = 0;
+    uint16_t best_move = get_best_move(&game, 0);
     uint8_t depth = 1;
+    float elapsed_time;
 
-    //Reached$ printf("Best move : %s\n", move2str(best_move));
     while (0xA34){
-        //Invoke search, TODO
-        best_move = get_best_move(&game, depth); //Unreached$
-        printf("Best move : %s\n", move2str(best_move));
-        float elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
-        if (elapsed_time >= time_control){
+        elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
+        if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);
+        if (elapsed_time >= time_control || time_control<0){
             break;
         }
+        //Invoke search
+        best_move = get_best_move(&game, depth);
         depth++;
     }
+    if (time_control>0) printf("At depth %i taking %f seconds: ", depth, elapsed_time);
     return best_move;
 }
 

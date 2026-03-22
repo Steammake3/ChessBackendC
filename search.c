@@ -49,7 +49,7 @@ int search(Position *pos, uint8_t depth, int alpha, int beta){
     }
 
     Undo undoer; MoveList moves; LegalData legs;
-    generate_moves(pos, &moves, &legs, GEN_ALL); //Reached$
+    generate_moves(pos, &moves, &legs, GEN_ALL);
 
     if (moves.count==0){
         if (legs.checkers){ //checkmate );
@@ -57,9 +57,9 @@ int search(Position *pos, uint8_t depth, int alpha, int beta){
         }
         return 0; //Stalemate
     }
-    order_moves(&moves, pos, &legs); // <---- The issue$
+    order_moves(&moves, pos, &legs);
 
-    int best_score = -INF; uint16_t best_move = 0; //Unreached$
+    int best_score = -INF; uint16_t best_move = 0;
     //Search
     for (uint8_t i=0; i<moves.count; i++){
         make_move(pos, moves.moves[i], &undoer);
@@ -92,16 +92,17 @@ int search(Position *pos, uint8_t depth, int alpha, int beta){
 
 uint16_t get_best_move(Position *pos, uint8_t depth){
     search(pos, depth, -INF, INF);
-    //Unreached$ printf("Finding best move\n");
     TTEntry *entry = tt_probe_ptr(pos->zobrist);
-    return (entry ? entry->move : 0);
+
+    MoveList moves; LegalData legs; moves.count = 0;
+    generate_moves(pos, &moves, &legs, GEN_ALL);
+    return (entry ? entry->move : (legs.checkers ? UINT16_MAX : 0));
 }
 
 //Move ordering
 void order_moves(MoveList *ml, Position *pos, LegalData *legs){
     const uint8_t k = 4; //How many moves to actually sort
     int n = ml->count;
-    printf("1\n");
     for (int i = 0; i < k && i < n; i++) {
         int best_idx = i;
         for (int j = i + 1; j < n; j++) {
@@ -119,7 +120,6 @@ void order_moves(MoveList *ml, Position *pos, LegalData *legs){
 int guess_move_priority(uint16_t move, Position *pos, LegalData *legs){
     TTEntry *entry = tt_probe_ptr(pos->zobrist);
     if (entry && move == entry->move) return INF; //Hashed move
-    printf("2\n");
 
     int guess_rn = 0;
 

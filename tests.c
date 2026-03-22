@@ -101,7 +101,7 @@ uint64_t perft(Position *pos, int depth){
     if (depth==0) return 1ULL;
     Undo undid; uint64_t nodes = 0ULL;
 
-    generate_moves(pos, &mv, &legals);
+    generate_moves(pos, &mv, &legals, GEN_ALL);
     for (int i=0; i<mv.count; i++){
         make_move(pos, mv.moves[i], &undid);
         nodes += perft(pos, depth-1);
@@ -113,7 +113,7 @@ uint64_t perft(Position *pos, int depth){
 void perft_divide(Position *pos, int depth) {
     MoveList mv; LegalData legals;
     mv.count = 0;
-    generate_moves(pos, &mv, &legals);
+    generate_moves(pos, &mv, &legals, GEN_ALL);
 
     uint64_t total = 0ULL;
 

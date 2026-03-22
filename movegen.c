@@ -528,6 +528,7 @@ bool square_attacked(int sq, LegalData *legals){
 }
 
 void generate_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn){
+    moves->count = 0;
     compute_pins_n_checks(pos, legals);
 
     bool to_quiesence = qsn && (legals->checkers==0);
