@@ -8,10 +8,11 @@
 Position game;
 const char *info = "----\nHello! Use the following commands -> \n"
     "\ta1a1 - makes a move from a1 to a1 (obviously other moves like e2e4 also work)\n"
-    "\t/d - prints ASCII repr of board (WHITE, black)\n"
+    "\t/d - prints ASCII repr of board, add a second character to show FEN too (WHITE, black)\n"
     "\tQ - quits game\n"
     "\t/undo - undoes previous move\n"
-    "\t/log - prints a list of all moves played so far\n\n";
+    "\t/log - prints a list of all moves played so far\n"
+    "\t#{FEN} - loads a FEN\n\n";
 
 int main(int argc, char *argv[]){
     if (argc!=3){
@@ -38,7 +39,7 @@ int main(int argc, char *argv[]){
 
     printf("%s", info);
     init_consts();
-    char taken[6];
+    char taken[128];
     uint16_t chosenmove = 0;
     uint16_t playermove = 0;
     load_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &game);
@@ -54,12 +55,28 @@ int main(int argc, char *argv[]){
     }
 
     while (0xA34){
-        scanf("%5s", taken);
+        fgets(taken, sizeof(taken), stdin); taken[strcspn(taken, "\n")] = '\0';
         if (taken[0]=='Q' || taken[0]=='q') break;
+
+        else if (taken[0]=='#'){ //Load FEN
+            memmove(taken, taken + 1, strlen(taken)); //Remove #
+            load_position(taken, &game);
+            memset(undid, '\0', sizeof(undid)); memset(moves, '\0', sizeof(moves)); halfmove_ctr=0;//Clean up
+            if (game.side_to_move == !get_first_move){ //If bot to move bruh
+                chosenmove = best_move(control);
+                printf("%s\n", move2str(chosenmove));
+                make_move(&game, chosenmove, &undid[halfmove_ctr]);
+                moves[halfmove_ctr] = chosenmove;
+                halfmove_ctr++;
+            }
+        }
 
         else if (taken[0]=='/'){
             if (taken[1]=='d'){ //Print current position
-                printf("\n------------\n%s------------\n\n", ascii_repr(&game));
+                if (taken[2]=='\0')
+                    printf("\n------------\n%s------------\n\n", ascii_repr(&game));
+                else
+                    printf("\n------------\n%s%s\n------------\n\n", ascii_repr(&game), unload_position(&game));
             } else if (taken[1]=='l'){ //Print log
                 for (int mv_ctr = 0; mv_ctr < halfmove_ctr; mv_ctr += 2){
                     printf("%s", move2str(moves[mv_ctr]));
@@ -142,11 +159,12 @@ uint16_t best_move(float time_control){
     clock_t start_time = clock();
     uint16_t best_move = get_best_move(&game, 0);
     uint8_t depth = 1;
-    float elapsed_time;
+    //Give bot ts
+    bot_time_control = time_control; start = start_time;
 
     while (0xA34){
-        elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
         if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);
+        elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
         if (elapsed_time >= time_control || time_control<0){
             break;
         }

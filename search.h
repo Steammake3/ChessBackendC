@@ -3,9 +3,14 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
 #include "position.h"
 #include "tt.h"
 #include "movegen.h"
+
+extern time_t start;
+extern float bot_time_control;
+extern float elapsed_time;
 
 int evaluate(Position *pos);
 

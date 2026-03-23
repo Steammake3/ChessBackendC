@@ -383,7 +383,7 @@ void precompute_edgedists(){
 }
 
 char* ascii_repr(Position *pos){
-    static char printed[128];
+    static char printed[256];
     memset(printed, '\0', sizeof(printed));
     char* idx = printed;
 
@@ -397,6 +397,7 @@ char* ascii_repr(Position *pos){
             if (pice==NO_SQ) *idx++ = '.';
             else if (pice >= 0 && pice < 12) *idx++ = key[pice];
             else *idx++ = '?';
+            *idx++ = ' ';
         }
         *idx++ = '\n';
     }
