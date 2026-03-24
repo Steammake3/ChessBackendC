@@ -47,7 +47,7 @@ int main(int argc, char *argv[]){
     tt_init(32); //FREE LATER
 
     if (get_first_move){
-        chosenmove = best_move(control);
+        chosenmove = id_best_move(control);
         printf("%s\n", move2str(chosenmove));
         make_move(&game, chosenmove, &undid[halfmove_ctr]);
         moves[halfmove_ctr] = chosenmove;
@@ -61,9 +61,11 @@ int main(int argc, char *argv[]){
         else if (taken[0]=='#'){ //Load FEN
             memmove(taken, taken + 1, strlen(taken)); //Remove #
             load_position(taken, &game);
+            printf("Loaded %.9s... successfully!\n", taken);
             memset(undid, '\0', sizeof(undid)); memset(moves, '\0', sizeof(moves)); halfmove_ctr=0;//Clean up
             if (game.side_to_move == !get_first_move){ //If bot to move bruh
-                chosenmove = best_move(control);
+                printf("Deciding upon move rn... \n");
+                chosenmove = id_best_move(control);
                 printf("%s\n", move2str(chosenmove));
                 make_move(&game, chosenmove, &undid[halfmove_ctr]);
                 moves[halfmove_ctr] = chosenmove;
@@ -95,7 +97,7 @@ int main(int argc, char *argv[]){
 
         } else { //PlayBOT
             //Check for check/stalemate (not the cleanest but it works)
-            chosenmove = best_move(-1.0);
+            chosenmove = id_best_move(-1.0);
             if (chosenmove==0){ //Stalemate
                 printf("STALEMATE!!\n"); break;
             } else if (chosenmove==UINT16_MAX){ //Checkmate
@@ -107,7 +109,7 @@ int main(int argc, char *argv[]){
             moves[halfmove_ctr] = playermove;
             halfmove_ctr++;
 
-            chosenmove = best_move(control);
+            chosenmove = id_best_move(control);
             if (chosenmove==0){ //Stalemate
                 printf("STALEMATE!!\n"); break;
             } else if (chosenmove==UINT16_MAX){ //Checkmate
@@ -155,12 +157,12 @@ char* move2str(uint16_t move){
     return move_str;
 }
 
-uint16_t best_move(float time_control){
+uint16_t id_best_move(float time_control){
     clock_t start_time = clock();
     uint16_t best_move = get_best_move(&game, 0);
     uint8_t depth = 1;
     //Give bot ts
-    bot_time_control = time_control; start = start_time;
+    bot_time_control = time_control<0 ? 1 : time_control; start = start_time;
 
     while (0xA34){
         if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);

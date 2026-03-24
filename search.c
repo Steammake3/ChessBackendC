@@ -4,6 +4,7 @@
 #include "tt.h"
 
 #define INF 999999
+#define TIMEOUT 99999999
 #define popcount(x) __builtin_popcountll(x)
 
 #define pawnValue 100
@@ -38,14 +39,15 @@ int evaluate(Position *pos){
 int quiesence_search(Position *pos, int alpha, int beta){
     MoveList moves; LegalData legs; compute_pins_n_checks(pos, &legs);
     generate_moves(pos, &moves, &legs, legs.checkers ? GEN_ALL : GEN_QSN);
-    if (moves.count==0){
-        if (legs.checkers) return evaluate(pos); //No more quiesence moves
-        else return -INF;
-    }
 
     int stand_pat = evaluate(pos);
     if (stand_pat >= beta) return beta;
     if (stand_pat > alpha) alpha = stand_pat;
+
+    if (moves.count==0){
+        if (legs.checkers) return -INF; //No more quiesence moves
+        else return stand_pat;
+    }
 
     order_moves(&moves, pos, &legs); int best_score = -INF; Undo undoer;
 
@@ -53,6 +55,8 @@ int quiesence_search(Position *pos, int alpha, int beta){
         make_move(pos, moves.moves[i], &undoer);
         int evalution = -quiesence_search(pos, -beta, -alpha);
         unmake_move(pos, moves.moves[i], &undoer);
+
+        if (evalution == -TIMEOUT) return TIMEOUT;
 
         if (evalution > best_score) {
             best_score = evalution;
@@ -63,18 +67,18 @@ int quiesence_search(Position *pos, int alpha, int beta){
         } if (evalution > alpha){
             alpha = evalution;
         }
-
+        
         //Time check
         elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
         if (elapsed_time >= bot_time_control){
-            return best_score;
+            return TIMEOUT;
         }
     }
 
     return best_score;
 }
 
-int search(Position *pos, uint8_t depth, int alpha, int beta){
+int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
     int alpha_orig = alpha;
     if (depth==0) return quiesence_search(pos, alpha, beta); //Quiesence comes later
 
@@ -107,8 +111,13 @@ int search(Position *pos, uint8_t depth, int alpha, int beta){
     //Search
     for (uint8_t i=0; i<moves.count; i++){
         make_move(pos, moves.moves[i], &undoer);
-        int evalution = -search(pos, depth-1, -beta, -alpha);
+        int evalution = -search(pos, depth-1, -beta, -alpha, NULL);
         unmake_move(pos, moves.moves[i], &undoer);
+
+        if (evalution == -TIMEOUT){
+            if (move) break;
+            else return TIMEOUT;
+        }
 
         if (evalution > best_score) {
             best_score = evalution;
@@ -117,6 +126,7 @@ int search(Position *pos, uint8_t depth, int alpha, int beta){
 
         if (evalution >= beta){ //Move was so good that the opponent prolly wants to avoid ts
             tt_store(pos->zobrist, depth, beta, TT_LOWERBOUND, moves.moves[i]);
+            if (move) break;
             return beta; //Stop this engine line, go *snip* MWAHAHA
         } if (evalution > alpha){
             alpha = evalution;
@@ -125,28 +135,30 @@ int search(Position *pos, uint8_t depth, int alpha, int beta){
         //Time check
         elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
         if (elapsed_time >= bot_time_control){
-            break;
+            if (move) break;
+            else return TIMEOUT;
         }
     }
 
     //Write to TT
-    uint8_t flag;
-    if (best_score<=alpha_orig) flag = TT_UPPERBOUND;
-    else if (best_score>=beta) flag = TT_LOWERBOUND;
-    else flag = TT_EXACT;
+    if (best_score != TIMEOUT && !move) {
+        // store TT only if search was fully completed
+        uint8_t flag = (best_score <= alpha_orig) ? TT_UPPERBOUND :
+                   (best_score >= beta) ? TT_LOWERBOUND : TT_EXACT;
+        tt_store(pos->zobrist, depth, best_score, flag, best_move);
+    }
 
-    tt_store(pos->zobrist, depth, best_score, flag, best_move);
+    if (move) *move = best_move;
     //Return
-    return alpha;
+    return best_score;
 }
 
 uint16_t get_best_move(Position *pos, uint8_t depth){
-    search(pos, depth, -INF, INF);
-    TTEntry *entry = tt_probe_ptr(pos->zobrist);
+    uint16_t move = 0; search(pos, depth, -INF, INF, &move);
 
-    MoveList moves; LegalData legs; moves.count = 0;
-    generate_moves(pos, &moves, &legs, GEN_ALL);
-    return (entry ? entry->move : (legs.checkers ? UINT16_MAX : 0));
+    LegalData legs;
+    compute_pins_n_checks(pos, &legs);
+    return (move ? move : (legs.checkers ? UINT16_MAX : 0));
 }
 
 //Move ordering

@@ -15,7 +15,7 @@ extern float elapsed_time;
 int evaluate(Position *pos);
 
 int quiesence_search(Position *pos, int alpha, int beta);
-int search(Position *pos, uint8_t depth, int alpha, int beta);
+int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move);
 
 //Helpers
 int material_eval(Position *pos);
