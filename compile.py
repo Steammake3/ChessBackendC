@@ -13,8 +13,13 @@ def list_files_in_directory(path='.'):
 
 files = list_files_in_directory()
 
+finale = ["gcc", "-O2", "-Wshadow", *files, "-o", "bot.exe"]
+if (input("Debug? > ")):
+    finale = ["gcc", "-O0", "-g", "-Wshadow", *files, "-o", "bot.exe"]
+
+
 try:
-    subprocess.run(["gcc", "-O0", "-g", *files, "-o", "bot.exe"], check=True, capture_output=True, text=True)
+    subprocess.run(finale, check=True, capture_output=True, text=True)
     print("Compilation succeeded.")
 except subprocess.CalledProcessError as e:
     print(f"Compilation failed with code {e.returncode}: {e.stderr}")

@@ -3,7 +3,6 @@
 #include <string.h>
 #include "main.h"
 #include "search.h"
-#define MAX_HISTORY 1024
 
 Position game;
 const char *info = "----\nHello! Use the following commands -> \n"
@@ -99,7 +98,7 @@ int main(int argc, char *argv[]){
             //Check for check/stalemate (not the cleanest but it works)
             chosenmove = id_best_move(-1.0);
             if (chosenmove==0){ //Stalemate
-                printf("STALEMATE!!\n"); break;
+                printf("DRAW!!\n"); break;
             } else if (chosenmove==UINT16_MAX){ //Checkmate
                 printf("CHECKMATE!! %s wins!\n", get_first_move ? "WHITE" : "black"); break;
             }
@@ -111,7 +110,7 @@ int main(int argc, char *argv[]){
 
             chosenmove = id_best_move(control);
             if (chosenmove==0){ //Stalemate
-                printf("STALEMATE!!\n"); break;
+                printf("DRAW!!\n"); break;
             } else if (chosenmove==UINT16_MAX){ //Checkmate
                 printf("CHECKMATE!! %s wins!\n", get_first_move ? "black" : "WHITE"); break;
             }
@@ -159,10 +158,11 @@ char* move2str(uint16_t move){
 
 uint16_t id_best_move(float time_control){
     clock_t start_time = clock();
-    uint16_t best_move = get_best_move(&game, 0);
-    uint8_t depth = 1;
     //Give bot ts
     bot_time_control = time_control<0 ? 1 : time_control; start = start_time;
+    uint16_t best_move = get_best_move(&game, 0);
+    uint8_t depth = 1;
+    uint16_t best_given_move;
 
     while (0xA34){
         if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);
@@ -171,10 +171,11 @@ uint16_t id_best_move(float time_control){
             break;
         }
         //Invoke search
-        best_move = get_best_move(&game, depth);
+        best_given_move = get_best_move(&game, depth);
+        if (best_given_move) best_move = best_given_move; //Don't store nullmoves
         depth++;
     }
-    if (time_control>0) printf("At depth %i taking %f seconds: ", depth, elapsed_time);
+    if (time_control>0) printf("At depth %i, taking %f seconds: ", depth, elapsed_time);
     return best_move;
 }
 

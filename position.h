@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#define MAX_HISTORY 1024 //defined in position.h
 
 #define NO_SQ 64
 #define WHITE 0
@@ -43,8 +44,11 @@ typedef struct {
     uint16_t fullmove;
     uint64_t hash;
     uint8_t flags; //0 Normal, 1 EP, 2 Castle, 3 Promotion
+    uint16_t last_irreversible;
 } Undo;
 
+extern uint64_t repetition_tableaus[MAX_HISTORY]; extern uint16_t rep_idx;
+extern uint16_t last_irreversible;
 extern uint8_t CHEBYSHEV[64][64];
 extern uint8_t EDGEDISTS[64][8];
 extern const int8_t DIRECTIONS[8]; 

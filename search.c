@@ -18,6 +18,7 @@ int values[6] = {pawnValue, knightValue, bishopValue, rookValue, queenValue, 0};
 time_t start;
 float bot_time_control = 0.1;
 float elapsed_time;
+uint64_t nodes;
 
 //Helpers
 int material_eval(Position *pos){
@@ -31,23 +32,27 @@ int material_eval(Position *pos){
     return (pawns+knights+bishops+rooks+queens) * perspective;
 }
 
+int pst_eval(Position *pos){
+    return 0;
+}
+
 //GGGOOOOOO!!!!
 int evaluate(Position *pos){
     return material_eval(pos);
 }
 
 int quiesence_search(Position *pos, int alpha, int beta){
+    //nodes++; //DEBUG
     MoveList moves; LegalData legs; compute_pins_n_checks(pos, &legs);
+    moves.count = 0;
     generate_moves(pos, &moves, &legs, legs.checkers ? GEN_ALL : GEN_QSN);
 
     int stand_pat = evaluate(pos);
     if (stand_pat >= beta) return beta;
     if (stand_pat > alpha) alpha = stand_pat;
 
-    if (moves.count==0){
-        if (legs.checkers) return -INF; //No more quiesence moves
-        else return stand_pat;
-    }
+    int ref = be_referee(pos, &moves, &legs, 0);
+    if (ref!=1) return ref ? ref : stand_pat;
 
     order_moves(&moves, pos, &legs); int best_score = -INF; Undo undoer;
 
@@ -97,14 +102,11 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
     }
 
     Undo undoer; MoveList moves; LegalData legs;
+    moves.count = 0; bool timed_out = false; bool searched_any = false;
     generate_moves(pos, &moves, &legs, GEN_ALL);
 
-    if (moves.count==0){
-        if (legs.checkers){ //checkmate );
-            return -INF+depth; //This makes quicker checkmates more favorable
-        }
-        return 0; //Stalemate
-    }
+    int ref = be_referee(pos, &moves, &legs, depth);
+    if (ref!=1) return ref;
     order_moves(&moves, pos, &legs);
 
     int best_score = -INF; uint16_t best_move = 0;
@@ -115,8 +117,9 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         unmake_move(pos, moves.moves[i], &undoer);
 
         if (evalution == -TIMEOUT){
+            timed_out = true;
             if (move) break;
-            else return TIMEOUT;
+            else if (searched_any) return TIMEOUT;
         }
 
         if (evalution > best_score) {
@@ -125,9 +128,12 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         }
 
         if (evalution >= beta){ //Move was so good that the opponent prolly wants to avoid ts
-            tt_store(pos->zobrist, depth, beta, TT_LOWERBOUND, moves.moves[i]);
-            if (move) break;
-            return beta; //Stop this engine line, go *snip* MWAHAHA
+            if (!move){
+                tt_store(pos->zobrist, depth, beta, TT_LOWERBOUND, moves.moves[i]);
+                return beta; //Stop this engine line, go *snip* MWAHAHA
+            }
+
+            break;
         } if (evalution > alpha){
             alpha = evalution;
         }
@@ -136,12 +142,13 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
         if (elapsed_time >= bot_time_control){
             if (move) break;
-            else return TIMEOUT;
+            else if (searched_any) return TIMEOUT;
         }
+        searched_any = true;
     }
 
     //Write to TT
-    if (best_score != TIMEOUT && !move) {
+    if (!timed_out && !move) {
         // store TT only if search was fully completed
         uint8_t flag = (best_score <= alpha_orig) ? TT_UPPERBOUND :
                    (best_score >= beta) ? TT_LOWERBOUND : TT_EXACT;
@@ -154,6 +161,7 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
 }
 
 uint16_t get_best_move(Position *pos, uint8_t depth){
+    nodes = 0;
     uint16_t move = 0; search(pos, depth, -INF, INF, &move);
 
     LegalData legs;
@@ -210,4 +218,35 @@ int guess_move_priority(uint16_t move, Position *pos, LegalData *legs){
     }
 
     return guess_rn;
+}
+
+//Hey you! Yes, you! Oh, you don't wanna be the referee? Well, he can be!
+int be_referee(Position *pos, MoveList *moves, LegalData *legs, int depth){
+    int draw_type = get_draw_type(pos, moves, legs);
+    switch (draw_type){
+        case STALEMATE: return CONTEMPT; break;
+        case FIFTYMOVES: return CONTEMPT; break;
+        case THREEFOLD: return CONTEMPT; break;
+        case CHECKMATE: return -INF-depth; break; //Bcz what can be worse than losing a game of chess?
+    }
+    return 1;
+}
+
+int get_draw_type(Position *pos, MoveList *moves, LegalData *legs){
+    if (pos->halfmove>=100) return FIFTYMOVES; //50 move rule
+
+    if (moves->count == 0){
+        if (legs->checkers){ //CHECKMATE!!
+            return CHECKMATE;
+        }
+        return STALEMATE; //Stalemate
+    }
+
+    uint8_t repetition_counter = 1;
+    for (int i=last_irreversible; i<rep_idx-1; i++){
+        if (repetition_tableaus[i]==pos->zobrist)
+            if (++repetition_counter==3) return THREEFOLD; //Threefold repetition
+    }
+
+    return 0; //Game continues
 }

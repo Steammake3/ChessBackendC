@@ -26,6 +26,8 @@ typedef struct {
 } Position;
  */
 
+uint64_t repetition_tableaus[MAX_HISTORY] = {0}; uint16_t rep_idx = 0;
+uint16_t last_irreversible = 0;
 uint8_t CHEBYSHEV[64][64];
 uint8_t EDGEDISTS[64][8];
 const int8_t DIRECTIONS[8] = {-9,-7,7,9,-8,-1,1,8};
@@ -195,6 +197,7 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     undo->fullmove = pos->fullmove;
     undo->hash = pos->zobrist;
     undo->flags = 0;
+    undo->last_irreversible = last_irreversible;
 
     //Move making :)
 
@@ -212,6 +215,7 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
 
     //Actual Castling (Rook side)
     if(start_piece%6==5 && ABS(start_sq-end_sq)==2){
+        last_irreversible = 0x1000; //Do later
         int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
         int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq+2;
         pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
@@ -268,6 +272,7 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
 
     //Half&Full Move
     if (start_piece%6==0 ||  captured_piece!=NO_SQ){
+        last_irreversible = 0x1000; //Do later
         pos->halfmove = 0;
     } else {pos->halfmove++;}
     if (side==BLACK) pos->fullmove++;
@@ -283,6 +288,10 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
         pos->zobrist ^= zh_ep_file[undo->ep % 8];
     if (pos->en_passant != NO_SQ)
         pos->zobrist ^= zh_ep_file[pos->en_passant % 8];
+    
+    //Do my rep_tab
+    repetition_tableaus[rep_idx++] = pos->zobrist;
+    if (last_irreversible == 0x1000) last_irreversible = rep_idx;
 }
 
 void unmake_move(Position *pos, uint16_t move, Undo *undo){
@@ -302,6 +311,7 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
     pos->halfmove = undo->halfmove;
     pos->fullmove = undo->fullmove;
     pos->zobrist = undo->hash;
+    last_irreversible = undo->last_irreversible;
 
     //Generic move is always done (except for promo)
     if (undo->flags == 3) { //promo
@@ -341,6 +351,9 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
     }
 
     pos->occupancies[BOTH] = pos->occupancies[WHITE] | pos->occupancies[BLACK];
+
+    //Do my rep_tab
+    repetition_tableaus[--rep_idx] = 0;
 }
 
 void precompute_chebyshev(){
