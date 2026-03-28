@@ -187,33 +187,13 @@ void compute_pins_n_checks(Position *pos, LegalData *legals){
                 else break;
             } else if (bb&pos->occupancies[enemy]){ //Fiend >:]
 
-                if (dir<4 && (bb&(e_queens|e_bishops))) { //Diag case
+                if ((dir<4 && (bb&(e_queens|e_bishops))) || (dir>=4 && (bb&(e_queens|e_rooks)))) { //Diag+manhattan case
                     if (candidate==NO_SQ) legals->checkers |= bb;
                     else {
                         legals->pinned |= BBd(candidate);
-
-                        uint64_t ray = 0ULL;
-                        for (int e = 1; e <= extent; e++){
-                            int sq = king + DIRECTIONS[dir]*e;
-                            ray |= BBd(sq);
-                        }
-
-                        legals->pin_dir[candidate] = ray;
+                        legals->pin_dir[candidate] = BETWEEN[king][cur_sq];
                     }
                 
-                } else if (dir>=4 && (bb&(e_queens|e_rooks))){ //manhattan
-                    if (candidate==NO_SQ) legals->checkers |= bb;
-                    else {
-                        legals->pinned |= BBd(candidate);
-
-                        uint64_t ray = 0ULL;
-                        for (int e = 1; e <= extent; e++){
-                            int sq = king + DIRECTIONS[dir]*e;
-                            ray |= BBd(sq);
-                        }
-
-                        legals->pin_dir[candidate] = ray;
-                    }
                 }
                 break;
             }
@@ -237,30 +217,7 @@ void compute_pins_n_checks(Position *pos, LegalData *legals){
         } else {
             // sliding piece: rook, bishop, queen
             // calculate ray from king to checker
-            int dir = -1;
-
-            // find the direction of the checker relative to the king
-            for (int d = 0; d < 8; d++) {
-                for (int dist = 1; dist <= EDGEDISTS[king][d]; dist++) {
-                    int sq = king + DIRECTIONS[d] * dist;
-                    if (sq == checker_sq) {
-                        dir = d;
-                        break;
-                    }
-                    //if (BBd(sq) & pos->occupancies[BOTH]) break; // blocked
-                }
-                if (dir != -1) break;
-            }
-
-            if (dir != -1) {
-                // build the block mask along the ray
-                for (int dist = 1; dist <= EDGEDISTS[king][dir]; dist++) {
-                    int sq = king + DIRECTIONS[dir] * dist;
-                    legals->block_mask |= BBd(sq);
-                    if (sq == checker_sq) break; // stop at the checker
-                    if (BBd(sq) & pos->occupancies[BOTH]) break; // blocked by piece
-                }
-            }
+            legals->block_mask = BETWEEN[king][checker_sq];
         }
     }
     legals->enemy_attack_maps = compute_attack_map(pos, enemy, 0ULL);

@@ -69,8 +69,8 @@ int move_making_check(){
 
 int perft_test(){
     Position pos;
-    load_position("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", &pos);
-    init_zobrist(); init_attack_tables(); precompute_edgedists();// Undo u;
+    load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", &pos);
+    init_zobrist(); init_attack_tables(); precompute_edgedists(); precompute_betweens();// Undo u;
     //make_move(&pos, 0xac3, &u);
 
     printf("FEN : %s\n", unload_position(&pos));
@@ -82,7 +82,7 @@ int perft_test(){
 
 int perft_divide_test(){
     Position pos;
-    load_position("r3k2r/Ppp2ppp/1b3nbN/nPPp4/BB2P3/q4N2/Pp1P2PP/R2Q1RK1 w kq d6 0 2", &pos);
+    load_position("r4rk1/1pp1qppp/p1npBn2/2b1p1B1/4P1b1/P1NP1N2/1PP1QPPP/R4RK1 b - - 1 10", &pos);
     //load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", &pos);
     //load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NKPP/RNBQ3R b - - 0 8", &pos); //After e1f2
     //load_position("rnb2k1r/pp1Pbppp/1qp5/8/2B5/8/PPP1NKPP/RNBQ3R w - - 1 9", &pos); //After d8b6

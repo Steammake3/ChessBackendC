@@ -31,6 +31,7 @@ uint16_t last_irreversible = 0;
 uint8_t CHEBYSHEV[64][64];
 uint8_t EDGEDISTS[64][8];
 const int8_t DIRECTIONS[8] = {-9,-7,7,9,-8,-1,1,8};
+uint64_t BETWEEN[64][64];
 
 void add_piece(int index, Position *position, char piece){
     //Adds a piece to `position` at `index` via FEN (so Q is White Queen) 
@@ -391,6 +392,20 @@ void precompute_edgedists(){
             EDGEDISTS[sq][5] = w;
             EDGEDISTS[sq][6] = e;
             EDGEDISTS[sq][7] = n;
+        }
+    }
+}
+
+void precompute_betweens(){ //PRECOMPUTE EDGEDISTS first!!! plz bruh
+    memset(BETWEEN, 0, sizeof(BETWEEN));
+    for (uint8_t i=0; i<64; i++){
+        for (uint8_t dir=0; dir<8; dir++){
+            uint64_t for_ts_dir = 0ULL;
+            for (uint8_t dist=1; dist<=EDGEDISTS[i][dir]; dist++){
+                uint8_t j = i + DIRECTIONS[dir]*dist;
+                for_ts_dir |= BBd(j);
+                BETWEEN[i][j] = for_ts_dir;
+            }
         }
     }
 }

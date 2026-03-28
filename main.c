@@ -180,5 +180,9 @@ uint16_t id_best_move(float time_control){
 }
 
 void init_consts(){
-    init_attack_tables(); precompute_chebyshev(); precompute_edgedists(); init_zobrist();
+    init_attack_tables();
+    precompute_chebyshev();
+    precompute_edgedists();
+    init_zobrist();
+    precompute_betweens();
 }
