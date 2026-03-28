@@ -13,13 +13,15 @@ def list_files_in_directory(path='.'):
 
 files = list_files_in_directory()
 
+antiqatiba = input("Debug? > ")
+
 finale = ["gcc", "-O2", "-Wshadow", *files, "-o", "bot.exe"]
-if (input("Debug? > ")):
+if (antiqatiba):
     finale = ["gcc", "-O0", "-g", "-Wshadow", *files, "-o", "bot.exe"]
 
 
 try:
     subprocess.run(finale, check=True, capture_output=True, text=True)
-    print("Compilation succeeded.")
+    print(f"Compilation succeeded. Debug : {"ON" if antiqatiba else "OFF"}")
 except subprocess.CalledProcessError as e:
     print(f"Compilation failed with code {e.returncode}: {e.stderr}")
