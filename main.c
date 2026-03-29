@@ -185,4 +185,5 @@ void init_consts(){
     precompute_edgedists();
     init_zobrist();
     precompute_betweens();
+    precompute_hq_masks();
 }

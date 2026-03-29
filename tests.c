@@ -11,8 +11,12 @@ int perft_test();
 int perft_divide_test();
 uint64_t perft(Position *pos, int depth);
 void perft_divide(Position *pos, int depth);
+int hq_test();
+void init_consts();
 
 int main(){
+    init_consts();
+    printf("mask : %X\n", hq_masks[DIAG][26]);
     return perft_test();
 }
 
@@ -69,7 +73,7 @@ int move_making_check(){
 
 int perft_test(){
     Position pos;
-    load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", &pos);
+    load_position("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", &pos);
     init_zobrist(); init_attack_tables(); precompute_edgedists(); precompute_betweens();// Undo u;
     //make_move(&pos, 0xac3, &u);
 
@@ -82,14 +86,20 @@ int perft_test(){
 
 int perft_divide_test(){
     Position pos;
-    load_position("r4rk1/1pp1qppp/p1npBn2/2b1p1B1/4P1b1/P1NP1N2/1PP1QPPP/R4RK1 b - - 1 10", &pos);
+    //load_position("r4rk1/1pp1qppp/p1npBn2/2b1p1B1/4P1b1/P1NP1N2/1PP1QPPP/R4RK1 b - - 1 10", &pos);
     //load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", &pos);
     //load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NKPP/RNBQ3R b - - 0 8", &pos); //After e1f2
     //load_position("rnb2k1r/pp1Pbppp/1qp5/8/2B5/8/PPP1NKPP/RNBQ3R w - - 1 9", &pos); //After d8b6
     //load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ - 0 8", &pos); //After a2a3
     //load_position("rnb2k1r/pp1Pbppp/2p5/q7/2B5/P7/1PP1NnPP/RNBQK2R w KQ - 1 9", &pos); //After d8b6
-    init_zobrist(); init_attack_tables(); precompute_edgedists();// Undo u;
+    Undo u;
     //make_move(&pos, 0xac3, &u);
+    load_position("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", &pos);
+    make_move(&pos, MAKE_MOVE(4, 2, 0), &u);
+    //Go through a6e2(-2), b4c3(-1), h3g2(+2)
+    //make_move(&pos, 0x328, &u); //a6e2
+    //make_move(&pos, 0x499, &u); //b4c3
+    make_move(&pos, 0x397, &u); //h3g2
 
     printf("FEN : %s\n", unload_position(&pos));
     perft_divide(&pos, 1);
@@ -150,4 +160,21 @@ void perft_divide(Position *pos, int depth) {
     }
 
     printf("Total nodes at depth %d: %llu\n", depth, total);
+}
+
+int hq_test(){
+    Position pos;
+    load_position("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", &pos);
+    uint64_t thing = HQ(26, pos.occupancies[BOTH], hq_masks[DIAG][26]);
+    printf("%llx\n", thing);
+    return 0;
+}
+
+void init_consts(){
+    init_attack_tables();
+    precompute_chebyshev();
+    precompute_edgedists();
+    init_zobrist();
+    precompute_betweens();
+    precompute_hq_masks();
 }

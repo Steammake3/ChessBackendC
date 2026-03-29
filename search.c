@@ -125,7 +125,8 @@ int pst_eval(Position *pos, uint8_t endgame_weight){
 
 //GGGOOOOOO!!!!
 int evaluate(Position *pos){
-    return material_eval(pos)+ pst_eval(pos, 0); //TODO: game phase rn
+    uint8_t eg_weight = phase_to_eg_weight(compute_phase(pos));
+    return material_eval(pos)+ pst_eval(pos, eg_weight); //TODO: game phase rn
 }
 
 int quiesence_search(Position *pos, int alpha, int beta){

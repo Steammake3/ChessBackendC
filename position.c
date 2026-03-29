@@ -218,7 +218,7 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     if(start_piece%6==5 && ABS(start_sq-end_sq)==2){
         last_irreversible = 0x1000; //Do later
         int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
-        int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq+2;
+        int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq-1;
         pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
         pos->occupancies[side] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
         //Zob
@@ -336,7 +336,7 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
         
         case 2: {//Castling
             int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
-            int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq+2;
+            int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq-1;
             pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
             pos->occupancies[side] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
             break;}

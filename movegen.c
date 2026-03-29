@@ -23,6 +23,7 @@
 uint64_t knight_attacks[64];
 uint64_t king_attacks[64];
 uint64_t pawn_attacks[2][64]; // [side][square]
+uint64_t hq_masks[4][64];
 
 void init_attack_tables() {
     for (int sq = 0; sq < 64; sq++) {
@@ -31,6 +32,22 @@ void init_attack_tables() {
 
         pawn_attacks[WHITE][sq] = generate_pawn_attacks(sq, WHITE);
         pawn_attacks[BLACK][sq] = generate_pawn_attacks(sq, BLACK);
+    }
+}
+
+void precompute_hq_masks(){
+    for (uint8_t sq=0; sq<64; sq++){
+        hq_masks[FILE_][sq] = FILE_MASK<<(sq & 0b000111);
+        hq_masks[RANK][sq] = RANK_MASK<<(sq & 0b111000);
+        int8_t d_off = (sq & 7)-(sq >> 3), a_off = (sq>>3)+(sq&7)-7;
+        if (d_off < 0) //Diagonal case
+            hq_masks[DIAG][sq] = DIAG_MASK << (-d_off*8);
+        else
+            hq_masks[DIAG][sq] = DIAG_MASK >> (d_off*8);
+        if (a_off < 0) //Anti-diagonal case
+            hq_masks[ANTI][sq] = ANTI_MASK >> (-a_off*8);
+        else
+            hq_masks[ANTI][sq] = ANTI_MASK << (a_off*8);
     }
 }
 
@@ -88,76 +105,13 @@ uint64_t generate_king_attacks(uint8_t sq) {
 }
 
 uint64_t generate_rook_attacks(uint8_t sq, uint64_t occ) {
-    uint64_t attacks = 0ULL;
-    int r = sq / 8;
-    int f = sq % 8;
-    // North
-    for (int rr = r + 1; rr <= 7; rr++) {
-        int s = rr * 8 + f;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-    // South
-    for (int rr = r - 1; rr >= 0; rr--) {
-        int s = rr * 8 + f;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-    // East
-    for (int ff = f + 1; ff <= 7; ff++) {
-        int s = r * 8 + ff;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-    // West
-    for (int ff = f - 1; ff >= 0; ff--) {
-        int s = r * 8 + ff;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-
-    return attacks;
+    uint64_t attacks = HQ(sq, occ, hq_masks[RANK][sq]) | HQ(sq, occ, hq_masks[FILE_][sq]);
+    return attacks & ~BBd(sq);
 }
 
 uint64_t generate_bishop_attacks(uint8_t sq, uint64_t occ) {
-    //ChatGPT modified my rook code to do this
-    uint64_t attacks = 0ULL;
-    int r = sq / 8;
-    int f = sq % 8;
-    // NE
-    for (int rr = r + 1, ff = f + 1; rr <= 7 && ff <= 7; rr++, ff++) {
-        int s = rr * 8 + ff;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-    // NW
-    for (int rr = r + 1, ff = f - 1; rr <= 7 && ff >= 0; rr++, ff--) {
-        int s = rr * 8 + ff;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-    // SE
-    for (int rr = r - 1, ff = f + 1; rr >= 0 && ff <= 7; rr--, ff++) {
-        int s = rr * 8 + ff;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-    // SW
-    for (int rr = r - 1, ff = f - 1; rr >= 0 && ff >= 0; rr--, ff--) {
-        int s = rr * 8 + ff;
-        uint64_t bit = BBd(s);
-        attacks |= bit;
-        if (occ & bit) break;
-    }
-
-    return attacks;
+    uint64_t attacks = HQ(sq, occ, hq_masks[DIAG][sq]) | HQ(sq, occ, hq_masks[ANTI][sq]);
+    return attacks & ~BBd(sq);
 }
 
 void compute_pins_n_checks(Position *pos, LegalData *legals){

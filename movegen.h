@@ -8,6 +8,11 @@
 #define GEN_ALL 0
 #define GEN_QSN 1
 
+#define FILE_MASK 0x0101010101010101ULL
+#define RANK_MASK 0xFFULL
+#define DIAG_MASK 0x8040201008040201ULL
+#define ANTI_MASK 0x0102040810204080ULL
+
 extern uint64_t knight_attacks[64];
 extern uint64_t king_attacks[64];
 extern uint64_t pawn_attacks[2][64]; // [side][square]
@@ -26,6 +31,10 @@ typedef struct {
     uint64_t enemy_attack_maps;
     uint64_t king_danger_map;
 } LegalData;
+
+typedef enum {
+    FILE_, RANK, DIAG, ANTI
+} Axes;
 
 void init_attack_tables();
 
@@ -83,7 +92,7 @@ static inline uint64_t reverse_u64(uint64_t x) { //Reverses uint64_t
 static inline uint64_t HQ(uint8_t sq, uint64_t occ, uint64_t mask) {
     uint64_t r = BBd(sq); uint64_t rp = reverse_u64(r);
     uint64_t o = mask&occ; uint64_t op = reverse_u64(o);
-    return mask&((o^(o-2*r))^reverse_u64(op^(op-2*rp)));
+    return mask&((o^(o-(r+r)))^reverse_u64(op^(op-(rp+rp))));
 }
 
 void precompute_hq_masks();

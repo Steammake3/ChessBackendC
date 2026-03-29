@@ -51,7 +51,7 @@ void order_moves(MoveList *ml, Position *pos, LegalData *legs);
 int guess_move_priority(uint16_t move, Position *pos, LegalData *legs);
 
 static inline int lerp(int a, int b, uint8_t t) {
-    return a + (t * (b - a)) / 255;
+    return a + (t * (b - a) + 127) / 255; //+127 permits better rounding
 }
 
 static inline int compute_phase(Position *pos) {
