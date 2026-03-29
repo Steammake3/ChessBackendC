@@ -16,8 +16,8 @@
 #define FLIP(sq) sq^0b111000
 
 extern time_t start;
-extern float bot_time_control;
-extern float elapsed_time;
+extern int bot_time_control;
+extern int elapsed_time;
 extern uint64_t nodes;
 static const int phase_weights[6] = {
     0, // pawn

@@ -16,8 +16,8 @@
 int values[6] = {pawnValue, knightValue, bishopValue, rookValue, queenValue, 0}; //King should take
 
 time_t start;
-float bot_time_control = 0.1;
-float elapsed_time;
+int bot_time_control = 1;
+int elapsed_time;
 uint64_t nodes;
 const int8_t middle_psts[6][64] = {
     {0, 0, 0, 0, 0, 0, 0, 0, //Black Pawns
@@ -162,7 +162,7 @@ int quiesence_search(Position *pos, int alpha, int beta){
         }
         
         //Time check
-        elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
+        elapsed_time = time(NULL) - start;
         if (elapsed_time >= bot_time_control){
             return TIMEOUT;
         }
@@ -227,7 +227,7 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         }
 
         //Time check
-        elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
+        elapsed_time = time(NULL) - start;
         if (elapsed_time >= bot_time_control){
             if (move) break;
             else if (searched_any) return TIMEOUT;
@@ -250,13 +250,23 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
 
 uint16_t get_best_move(Position *pos, uint8_t depth){
     nodes = 0;
-    uint16_t move = 0; search(pos, depth, -INF, INF, &move);
+    uint16_t move = 0;
+    search(pos, depth, -INF, INF, &move);
 
     LegalData legs;
     compute_pins_n_checks(pos, &legs);
-    return (move ? move : (legs.checkers ? UINT16_MAX : 0));
-}
 
+    MoveList movers;
+    generate_moves(pos, &movers, &legs, GEN_ALL);
+
+    int draw_type = get_draw_type(pos, &movers, &legs);
+    if(draw_type == STALEMATE || draw_type == FIFTYMOVES || draw_type == THREEFOLD)
+        return 0;
+    if(draw_type == CHECKMATE)
+        return UINT16_MAX;
+
+    return move ? move : UINT16_MAX-34; //This is only to prevent broken things
+}
 //Move ordering
 void order_moves(MoveList *ml, Position *pos, LegalData *legs){
     const uint8_t k = 4; //How many moves to actually sort
@@ -332,8 +342,9 @@ int get_draw_type(Position *pos, MoveList *moves, LegalData *legs){
 
     uint8_t repetition_counter = 1;
     for (int i=last_irreversible; i<rep_idx-1; i++){
-        if (repetition_tableaus[i]==pos->zobrist)
+        if (repetition_tableaus[i]==pos->zobrist){
             if (++repetition_counter==3) return THREEFOLD; //Threefold repetition
+        }
     }
 
     return 0; //Game continues

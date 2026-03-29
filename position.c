@@ -216,7 +216,7 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
 
     //Actual Castling (Rook side)
     if(start_piece%6==5 && ABS(start_sq-end_sq)==2){
-        last_irreversible = 0x1000; //Do later
+        last_irreversible = rep_idx; //Rep tab
         int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
         int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq-1;
         pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
@@ -273,7 +273,7 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
 
     //Half&Full Move
     if (start_piece%6==0 ||  captured_piece!=NO_SQ){
-        last_irreversible = 0x1000; //Do later
+        last_irreversible = rep_idx; //Rep tab
         pos->halfmove = 0;
     } else {pos->halfmove++;}
     if (side==BLACK) pos->fullmove++;
@@ -292,7 +292,6 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     
     //Do my rep_tab
     repetition_tableaus[rep_idx++] = pos->zobrist;
-    if (last_irreversible == 0x1000) last_irreversible = rep_idx;
 }
 
 void unmake_move(Position *pos, uint16_t move, Undo *undo){
