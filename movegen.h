@@ -50,13 +50,6 @@ void generate_knight_moves(Position *pos, MoveList *moves, LegalData *legals, bo
 
 void generate_king_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn);
 
-static inline int pop_lsb(uint64_t *b) {
-    //if (*b == 0) return NO_SQ;
-    int sq = __builtin_ctzll(*b);
-    *b &= *b - 1;
-    return sq;
-}
-
 //Attack calcs functions for knp unnecessary to call, me just use lookup :)
 uint64_t generate_king_attacks(uint8_t sq);
 uint64_t generate_knight_attacks(uint8_t sq);
@@ -96,5 +89,7 @@ static inline uint64_t HQ(uint8_t sq, uint64_t occ, uint64_t mask) {
 }
 
 void precompute_hq_masks();
+
+bool move_is_check(Position *pos, uint16_t move);
 
 #endif

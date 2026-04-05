@@ -19,13 +19,13 @@ int main(int argc, char *argv[]){
         printf("USAGE - BOT time_control{float} side_of_bot{w|b}"); return 1;
     }
 
-    int control;
+    float control;
     bool get_first_move;
     Undo undid[MAX_HISTORY]; memset(undid, '\0', sizeof(undid));
     uint16_t moves[MAX_HISTORY]; memset(moves, '\0', sizeof(moves));
     uint16_t halfmove_ctr = 0;
 
-    if (sscanf(argv[1], "%d", &control) != 1){ //Time control
+    if (sscanf(argv[1], "%f", &control) != 1){ //Time control
         printf("Invalid time control\n");
         return 1;
     }
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]){
 
         } else { //PlayBOT
             //Check for check/stalemate (not the cleanest but it works)
-            chosenmove = id_best_move(-1);
+            chosenmove = id_best_move(-1.0);
             if (chosenmove==0){ //Stalemate
                 printf("DRAW!!\n"); break;
             } else if (chosenmove==UINT16_MAX){ //Checkmate
@@ -164,8 +164,8 @@ char* move2str(uint16_t move){
     return move_str;
 }
 
-uint16_t id_best_move(int time_control){
-    time_t start_time = time(NULL);
+uint16_t id_best_move(float time_control){
+    clock_t start_time = clock();
     //Give bot ts
     bot_time_control = time_control<0 ? 1 : time_control; start = start_time;
     uint16_t best_move = get_best_move(&game, 0);
@@ -174,16 +174,16 @@ uint16_t id_best_move(int time_control){
 
     while (0xA34){
         if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);
-        elapsed_time = time(NULL) - start_time;
+        elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
         if (elapsed_time >= time_control || time_control<0){
             break;
         }
         //Invoke search
         best_given_move = get_best_move(&game, depth);
-        if (best_given_move && (best_given_move!=UINT16_MAX-34)) best_move = best_given_move; //Don't store nullmoves
+        if (best_given_move && (best_given_move!=(UINT16_MAX-34))) best_move = best_given_move; //Don't store nullmoves
         depth++;
     }
-    if (time_control>0) printf("At depth %i, taking %d seconds: ", depth, elapsed_time);
+    if (time_control>0) printf("At depth %i, taking %f seconds: ", depth, elapsed_time);
     return best_move;
 }
 

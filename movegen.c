@@ -459,3 +459,14 @@ void generate_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn)
     printf("Pinned mask: %llx\n", legals.pinned);
     */
 }
+
+bool move_is_check(Position *pos, uint16_t move){ //Inefficient, must fix at some point
+    bool retval = false;
+
+    Undo temp; bool side = pos->side_to_move;
+    make_move(pos, move, &temp);
+    if (compute_attack_map(pos, side, 0ULL)&pos->bitboards[side?WK:BK]) retval = true;
+    unmake_move(pos, move, &temp);
+
+    return retval;
+}

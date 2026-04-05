@@ -8,7 +8,7 @@
 
 uint16_t str2move(const char move[]);
 char* move2str(uint16_t move);
-uint16_t id_best_move(int time_control);
+uint16_t id_best_move(float time_control);
 void init_consts();
 
 #endif
