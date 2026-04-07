@@ -58,7 +58,9 @@ uint64_t generate_pawn_attacks(uint8_t sq, int side);
 uint64_t generate_rook_attacks(uint8_t sq, uint64_t occ);
 uint64_t generate_bishop_attacks(uint8_t sq, uint64_t occ);
 
-bool square_attacked(int sq, LegalData *legals);
+static inline bool square_attacked(int sq, LegalData *legals){
+    return (BBd(sq)&legals->enemy_attack_maps)!=0;
+}
 uint64_t compute_attack_map(Position *pos, int by_side, uint64_t exclude);
 
 //Pin & Checks

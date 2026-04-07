@@ -17,6 +17,7 @@
 
 #define INF 999999
 #define TIMEOUT 99999999
+#define TIMEOUT_MOVE 0xfff7
 
 extern clock_t start;
 extern float bot_time_control;

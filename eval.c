@@ -117,9 +117,50 @@ int pst_eval(Position *pos, uint8_t endgame_weight){
 
 int init_evaluate(Position *pos){
     uint8_t eg_weight = phase_to_eg_weight(compute_phase(pos));
-    return material_eval(pos)+ pst_eval(pos, eg_weight); //TODO: game phase rn
+    pos->phase = compute_phase(pos);
+
+    int mideval = material_eval(pos)+pst_eval(pos, 0);
+    int endeval = material_eval(pos)+pst_eval(pos, UINT8_MAX);
+    pos->simple_eval_mid = mideval;
+    pos->simple_eval_end = endeval;
+
+    //Assert
+    int expected = material_eval(pos)+pst_eval(pos, eg_weight);// printf("Exp %d, ", expected);
+    /*
+    int actual = lerp(pos->simple_eval_mid, pos->simple_eval_end, eg_weight);// printf("Actual %d\n", actual);
+    int correct = (ABS(expected-actual)<=7);
+    if (!correct){
+        printf("Error in %s", unload_position(pos));
+        assert(correct);
+    }
+    */
+
+    //flip for sign
+    int8_t pov = pos->side_to_move ? -1 : 1;
+    pos->simple_eval_end *= pov; pos->simple_eval_mid *= pov;
+
+    return expected;
 }
 
 int evaluate(Position *pos){
-    return init_evaluate(pos);
+    int8_t pov = pos->side_to_move ? -1 : 1;
+    int answer = lerp(pos->simple_eval_mid, pos->simple_eval_end, phase_to_eg_weight(pos->phase));
+    /* //DEBUG
+    int expected = material_eval(pos)+pst_eval(pos, phase_to_eg_weight(compute_phase(pos)));
+    int answer = pov * lerp(pos->simple_eval_mid, pos->simple_eval_end, phase_to_eg_weight(pos->phase));
+    printf("Exp %d, got %d in position ", expected, answer); printf("%s ", unload_position(pos));
+    printf("|| E: mid:%d, end:%d, eg:%d, G: mid:%d, end:%d, eg:%d\n", 
+        material_eval(pos)+pst_eval(pos, 0), material_eval(pos)+pst_eval(pos, 0xff),
+        compute_phase(pos), pos->simple_eval_mid, pos->simple_eval_end,
+        pos->phase);
+    
+    //int correct = ABS(answer-expected)<2;
+    int correct = ABS(pov*(material_eval(pos)+
+        pst_eval(pos, 0xff))-pos->simple_eval_end)<2;
+
+    if (!correct){
+        assert(correct);
+    }*/
+
+    return pov * answer;
 }

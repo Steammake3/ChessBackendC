@@ -100,6 +100,7 @@ void load_position(const char fen[], Position *position){
     position->occupancies[2] = position->occupancies[0] | position->occupancies[1];
 
     init_hash(position);
+    init_evaluate(position);
 }
 
 char* unload_position(Position* position){
@@ -188,7 +189,9 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
 
     int start_piece = piece_at(start_sq, pos);
     int captured_piece = piece_at(end_sq, pos);
-    bool en_passanting = (end_sq==pos->en_passant && (start_piece%6)==0); //This makes it DRY
+    uint8_t start_type = start_piece%6;
+    uint8_t end_type = captured_piece%6;
+    bool en_passanting = (end_sq==pos->en_passant && (start_type)==0); //This makes it DRY
 
     //Undo pushed
     undo->captured = captured_piece;
@@ -199,10 +202,26 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     undo->hash = pos->zobrist;
     undo->flags = 0;
     undo->last_irreversible = last_irreversible;
+    undo->simple_eval_end = pos->simple_eval_end;
+    undo->simple_eval_mid = pos->simple_eval_mid;
+    undo->phase = pos->phase;
 
     //Move making :)
 
     pos->en_passant = NO_SQ;
+
+    const int8_t *start_pst = middle_psts[start_type]; //Endgame
+    if (start_type==WP || start_type==WK)
+        start_pst = endgame_psts[start_type==WP ? 0 : 1];
+    
+    const int8_t *cap_pst = middle_psts[end_type]; //Endgame
+    if (end_type==WP || end_type==WK)
+        cap_pst = endgame_psts[end_type==WP ? 0 : 1];
+
+    uint8_t my_flp = side ? 0 : 0b111000;
+    uint8_t other_flp = side ? 0b111000 : 0;
+
+    int mid_delta = 0; int end_delta = 0; int material_delta = 0;
 
     //Castling rights
     if (start_piece==WK) pos->castling_rights &= 0b0011;
@@ -215,7 +234,7 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     pos->zobrist ^= zh_castles[undo->castle] ^ zh_castles[pos->castling_rights];
 
     //Actual Castling (Rook side)
-    if(start_piece%6==5 && ABS(start_sq-end_sq)==2){
+    if(start_type==5 && ABS(start_sq-end_sq)==2){
         last_irreversible = rep_idx; //Rep tab
         int rook_from = (end_sq>start_sq)? start_sq+3 : start_sq-4;
         int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq-1;
@@ -226,6 +245,10 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
         pos->zobrist ^= zh_pieces[side==WHITE?WR:BR][rook_to];
         //For the Undo
         undo->flags = 2;
+        //Incremental Eval
+        mid_delta += middle_psts[WR][my_flp^(rook_to)] - middle_psts[WR][my_flp^(rook_from)];
+        //Rooks don't change
+        end_delta += middle_psts[WR][my_flp^(rook_to)] - middle_psts[WR][my_flp^(rook_from)];
     }
 
     //True move in progress, crazy i know right?
@@ -234,6 +257,9 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     //Zob
     pos->zobrist ^= zh_pieces[start_piece][start_sq];
     pos->zobrist ^= zh_pieces[start_piece][end_sq];
+    //Incremental Eval
+    mid_delta += middle_psts[start_type][my_flp^(end_sq)] - middle_psts[start_type][my_flp^(start_sq)];
+    end_delta += start_pst[my_flp^(end_sq)] - start_pst[my_flp^(start_sq)]; //PST must be changed
 
     //Normal capture, so not en passant
     if(captured_piece!=NO_SQ && !(en_passanting)){
@@ -241,6 +267,13 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
         pos->occupancies[side^1] ^= 1ULL<<end_sq;
         //Zob
         pos->zobrist ^= zh_pieces[captured_piece][end_sq];
+        //Eval (+= because opponent losing is good for us)
+        mid_delta += middle_psts[end_type][other_flp^(end_sq)]; //Unflipped as it is the opponent
+        end_delta += cap_pst[other_flp^(end_sq)];
+        //Now for material
+        material_delta += values[end_type];
+        //Phase
+        pos->phase -= phase_weights[end_type];
     }
 
     //En passant
@@ -252,31 +285,52 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
         pos->zobrist ^= zh_pieces[(side^1)*6+0][cap_sq];
         //For the Undo flags
         undo->flags = 1;
+        //Same as above, modified for goofy en passant reasons
+        mid_delta += middle_psts[WP][other_flp^(cap_sq)];
+        end_delta += endgame_psts[WP][other_flp^(cap_sq)];
+        //Now for material
+        material_delta += values[WP];
+        //Phase
+        pos->phase -= phase_weights[WP];
     }
 
     //Promotion
-    if (start_piece%6==0 && (end_sq>>3==0 || end_sq>>3==7)){
+    if (start_type==0 && (end_sq>>3==0 || end_sq>>3==7)){
+        uint8_t prp = 6*side+4-promo;
         pos->bitboards[start_piece] ^= (1ULL << end_sq);
-        pos->bitboards[6*side+4-promo] ^= (1ULL << end_sq);
+        pos->bitboards[prp] ^= (1ULL << end_sq);
         //Zob
         pos->zobrist ^= zh_pieces[start_piece][end_sq];
-        pos->zobrist ^= zh_pieces[6*side+4-promo][end_sq];
+        pos->zobrist ^= zh_pieces[prp][end_sq];
         //You know the drill by now
         undo->flags = 3;
+        //Eval again
+        mid_delta += middle_psts[prp%6][my_flp^(end_sq)] - middle_psts[WP][my_flp^(end_sq)];
+        end_delta += middle_psts[prp%6][my_flp^(end_sq)] - start_pst[my_flp^(end_sq)]; //Unchanged bcz can't promote to pawn or king
+        //Now for material
+        material_delta += values[prp%6] - values[WP];
+        //EG
+        pos->phase += phase_weights[prp%6] - phase_weights[WP];
     }
 
     //Double pawn pushes
-    if (start_piece%6==0 && ABS(start_sq-end_sq)==16){
+    if (start_type==0 && ABS(start_sq-end_sq)==16){
         pos->en_passant = (start_sq+end_sq)/2;
         //Zob later
     }
 
     //Half&Full Move
-    if (start_piece%6==0 ||  captured_piece!=NO_SQ){
+    if (start_type==0 ||  captured_piece!=NO_SQ){
         last_irreversible = rep_idx; //Rep tab
         pos->halfmove = 0;
     } else {pos->halfmove++;}
     if (side==BLACK) pos->fullmove++;
+
+    //Eval
+    mid_delta += material_delta; end_delta += material_delta;
+    int pov = side ? -1 : 1;
+    pos->simple_eval_mid += pov * mid_delta;
+    pos->simple_eval_end += pov * end_delta;
 
     //Side
     pos->side_to_move = !pos->side_to_move;
@@ -312,6 +366,9 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
     pos->fullmove = undo->fullmove;
     pos->zobrist = undo->hash;
     last_irreversible = undo->last_irreversible;
+    pos->simple_eval_end = undo->simple_eval_end;
+    pos->simple_eval_mid = undo->simple_eval_mid;
+    pos->phase = undo->phase;
 
     //Generic move is always done (except for promo)
     if (undo->flags == 3) { //promo

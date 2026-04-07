@@ -434,9 +434,6 @@ uint64_t compute_attack_map(Position *pos, int by_side, uint64_t exclude){
     return attack_mask;
 }
 
-bool square_attacked(int sq, LegalData *legals){
-    return (BBd(sq)&legals->enemy_attack_maps)!=0;
-}
 
 void generate_moves(Position *pos, MoveList *moves, LegalData *legals, bool qsn){
     moves->count = 0;

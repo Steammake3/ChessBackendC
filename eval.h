@@ -4,6 +4,8 @@
 #include "types.h"
 #include "movegen.h"
 
+#define FLIP(sq) sq^0b111000
+
 extern int values[6];
 
 static const int phase_weights[6] = {
@@ -15,8 +17,8 @@ static const int phase_weights[6] = {
     0  // king
 };
 //TODO: This is from BLACK's perspective
-const int8_t middle_psts[6][64];
-const int8_t endgame_psts[2][64]; //Pawn then King!
+extern const int8_t middle_psts[6][64];
+extern const int8_t endgame_psts[2][64]; //Pawn then King!
 
 //Helpers
 int material_eval(Position *pos);
@@ -31,7 +33,8 @@ int evaluate(Position *pos);
 int init_evaluate(Position *pos);
 
 static inline int lerp(int a, int b, uint8_t t) {
-    return a + (t * (b - a) + 127) / 255; //+127 permits better rounding
+    int64_t diff = (int64_t)b - (int64_t)a; //This shall save any overflows
+    return a + (t * diff + 127) / 255; //+127 permits better rounding
 }
 
 static inline int compute_phase(Position *pos) {
@@ -50,7 +53,7 @@ static inline int compute_phase(Position *pos) {
 static inline uint8_t phase_to_eg_weight(int phase) {
     if (phase < 0) phase = 0;
     if (phase > 24) phase = 24;
-    return (uint8_t)((24 - phase) * 255 / 24);
+    return (uint8_t)((24 - phase) * 255 + 12) / 24;
 }
 
 

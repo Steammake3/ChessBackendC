@@ -16,7 +16,7 @@ int quiesence_search(Position *pos, int alpha, int beta){
     moves.count = 0;
     generate_moves(pos, &moves, &legs, legs.checkers ? GEN_ALL : GEN_QSN);
 
-    int stand_pat = evaluate(pos);
+    int stand_pat = (bot_time_control==3.14159f) ? 314 : evaluate(pos);
     if (stand_pat >= beta) return beta;
     if (stand_pat > alpha) alpha = stand_pat;
 
@@ -154,7 +154,8 @@ uint16_t get_best_move(Position *pos, uint8_t depth){
     LegalData legs;
     compute_pins_n_checks(pos, &legs);
 
-    printf("Nodes: %llu\n", nodes);
+    //if (bot_time_control != 3.14159f)
+    //printf("Nodes: %llu\n", nodes);
 
     MoveList movers;
     generate_moves(pos, &movers, &legs, GEN_ALL);
@@ -165,7 +166,7 @@ uint16_t get_best_move(Position *pos, uint8_t depth){
     if(draw_type == CHECKMATE)
         return UINT16_MAX;
 
-    return move ? move : UINT16_MAX-34; //This is only to prevent broken things
+    return move ? move : TIMEOUT_MOVE; //This is only to prevent broken things
 }
 //Move ordering
 void order_moves(MoveList *ml, Position *pos, LegalData *legs){

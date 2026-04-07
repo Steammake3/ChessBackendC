@@ -167,8 +167,8 @@ char* move2str(uint16_t move){
 uint16_t id_best_move(float time_control){
     clock_t start_time = clock();
     //Give bot ts
-    bot_time_control = time_control<0 ? 1 : time_control; start = start_time;
-    uint16_t best_move = get_best_move(&game, 0);
+    bot_time_control = time_control<0.0 ? 3.14159f : time_control; start = start_time;
+    uint16_t best_move = 0;
     uint8_t depth = 1;
     uint16_t best_given_move;
 
@@ -180,7 +180,7 @@ uint16_t id_best_move(float time_control){
         }
         //Invoke search
         best_given_move = get_best_move(&game, depth);
-        if (best_given_move && (best_given_move!=(UINT16_MAX-34))) best_move = best_given_move; //Don't store nullmoves
+        if (best_given_move && (best_given_move!=TIMEOUT_MOVE)) best_move = best_given_move; //Don't store nullmoves
         depth++;
     }
     if (time_control>0) printf("At depth %i, taking %f seconds: ", depth, elapsed_time);

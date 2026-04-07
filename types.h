@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <assert.h>
 
 #define NO_SQ 64
 #define WHITE 0
@@ -35,7 +36,9 @@ typedef struct {
     bool side_to_move;
     uint8_t castling_rights; //KQkq White then Black
     uint64_t zobrist;
-    int simple_eval;
+    int simple_eval_mid; //Always from White POV
+    int simple_eval_end; //Always from White POV
+    uint8_t phase; //24 (Opening) to 0 (endgame)
 } Position;
 
 typedef struct {
@@ -47,7 +50,9 @@ typedef struct {
     uint64_t hash;
     uint8_t flags; //0 Normal, 1 EP, 2 Castle, 3 Promotion
     uint16_t last_irreversible;
-    int eval;
+    int simple_eval_mid;
+    int simple_eval_end;
+    uint8_t phase;
 } Undo;
 
 static inline int pop_lsb(uint64_t *b) {
