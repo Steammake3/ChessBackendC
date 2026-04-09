@@ -5,6 +5,7 @@
 
 TTEntry *tt_list;
 size_t tt_size;
+size_t tt_used;
 
 void tt_init(size_t size_mb){
     size_t bytes = size_mb * 1024 * 1024;
@@ -15,19 +16,23 @@ void tt_init(size_t size_mb){
 
     //force power of two (IMPORTANT for & masking)
     size_t pow2 = 1;
-    while (pow2 <= tt_size) pow2 <<= 1;
+    while (pow2 < tt_size) pow2 <<= 1;
     tt_size = pow2 >> 1;
 
     tt_list = malloc(tt_size * TT_BUCKET_SIZE * sizeof(TTEntry));
     memset(tt_list, 0, tt_size * TT_BUCKET_SIZE * sizeof(TTEntry));
+    tt_used = 0;
 }
 
 void tt_free(){
     free(tt_list);
     tt_list = NULL;
+    tt_size = 0;
+    tt_used = 0;
 }
 void tt_clear(){
     if (tt_list) memset(tt_list, 0, tt_size * TT_BUCKET_SIZE * sizeof(TTEntry));
+    tt_used = 0;
 }
 
 bool tt_probe(uint64_t key, TTEntry *out_entry){
@@ -38,7 +43,7 @@ bool tt_probe(uint64_t key, TTEntry *out_entry){
     for (int i = 0; i < TT_BUCKET_SIZE; i++){
         TTEntry *entry = &bucket[i];
 
-        if (entry->key == key){
+        if (entry->valid && entry->key == key){
             *out_entry = *entry;
             return true;
         }
@@ -53,7 +58,7 @@ TTEntry* tt_probe_ptr(uint64_t key) { //BE CAREFUL, DONT DESTROY TT, PLZ
 
     for (int i = 0; i < TT_BUCKET_SIZE; i++) {
         TTEntry *entry = &bucket[i];
-        if (entry->key == key)
+        if (entry->valid && entry->key == key)
             return entry;
     }
 
@@ -71,7 +76,7 @@ void tt_store(uint64_t key, int depth, int score, uint8_t flag, uint16_t move){
         TTEntry *entry = &bucket[i];
 
         // overwrite if same key and exact
-        if (entry->key == key){
+        if (entry->valid && entry->key == key){
             if (depth >= entry->depth || flag == TT_EXACT){
                 best = entry; break;
             } else {
@@ -80,12 +85,12 @@ void tt_store(uint64_t key, int depth, int score, uint8_t flag, uint16_t move){
         }
 
         // empty slot
-        if (entry->key == 0 && best == NULL){
+        if (!entry->valid && best == NULL){
             best = entry;
         }
 
         // track shallowest
-        if (entry->depth < shallowest->depth){
+        if (entry->valid && entry->depth < shallowest->depth){
             shallowest = entry;
         }
     }
@@ -94,9 +99,19 @@ void tt_store(uint64_t key, int depth, int score, uint8_t flag, uint16_t move){
         best = shallowest;
     }
 
+    if (!best->valid) {
+        tt_used++;
+    }
+
     best->key = key;
     best->depth = depth;
     best->score = score;
     best->flag = flag;
     best->move = move;
+    best->valid = true;
+}
+
+double tt_fullness(){
+    size_t total = tt_size * TT_BUCKET_SIZE;
+    return (double)tt_used / (double)total * 100.0;
 }

@@ -62,4 +62,40 @@ static inline int pop_lsb(uint64_t *b) {
     return sq;
 }
 
+static inline uint16_t str2move(const char move[]){
+    char from = move[0]-'a'+(move[1]-'1')*8;
+    char to = move[2]-'a'+(move[3]-'1')*8;
+    char promo = 0;
+    if (move[4]!='\0'){
+        if (move[4]=='r') promo=1;
+        if (move[4]=='b') promo=2;
+        if (move[4]=='n') promo=3;
+    }
+    return MAKE_MOVE(from, to, promo);
+}
+
+static inline char* move2str(uint16_t move){
+    int from = MOVE_FROM(move);
+    int to   = MOVE_TO(move);
+    int flag = MOVE_FLAGS(move);
+    static char move_str[6] = "Chess";
+    sprintf(move_str, "%c%c%c%c",
+        'a' + (from % 8),
+        '1' + (from / 8),
+        'a' + (to % 8),
+        '1' + (to / 8)
+    );
+    // Add promotion piece if any (skipping q for efficiency)
+    if (flag == 1) move_str[4] = 'r';
+    else if (flag == 2) move_str[4] = 'b';
+    else if (flag == 3) move_str[4] = 'n';
+    else move_str[4] = '\0';
+
+    return move_str;
+}
+
+
+//DEBUG Statements
+#define LOG //Write logs
+
 #endif

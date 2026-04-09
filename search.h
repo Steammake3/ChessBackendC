@@ -23,6 +23,10 @@ extern clock_t start;
 extern float bot_time_control;
 extern float elapsed_time;
 extern uint64_t nodes;
+extern uint64_t qnodes;
+#ifdef LOG
+    extern FILE *log;
+#endif
 
 int be_referee(Position *pos, MoveList *moves, LegalData *legs, int depth);
 int get_draw_type(Position *pos, MoveList *moves, LegalData *legs);

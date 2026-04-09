@@ -44,6 +44,17 @@ int main(int argc, char *argv[]){
     uint16_t playermove = 0;
     load_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &game);
     
+    #ifdef LOG
+        time_t rn_tt = time(NULL);
+        struct tm *rn = localtime(&rn_tt);
+
+        char file_name[128] = {0}; 
+        strftime(file_name, sizeof(file_name), "./logs/Game_%b%d_%H-%M.txt", rn);
+
+        log = fopen(file_name, "a");
+        printf("~~~CREATED LOG FILE~~~\n\n");
+    #endif
+
     tt_init(32); //FREE LATER
 
     if (get_first_move){
@@ -91,6 +102,9 @@ int main(int argc, char *argv[]){
                 if (halfmove_ctr > 0) {
                     halfmove_ctr--;
                     printf("***Undid %s\n", move2str(moves[halfmove_ctr]));
+                    #ifdef LOG
+                        fprintf(log, "UNDID move %s \n\n", move2str(moves[halfmove_ctr]));
+                    #endif
                     unmake_move(&game, moves[halfmove_ctr], &undid[halfmove_ctr]);
                 }
             } else if (taken[1]=='s'){
@@ -112,11 +126,17 @@ int main(int argc, char *argv[]){
             }
             //Do move
             playermove = str2move(taken);
+            #ifdef LOG
+                fprintf(log, "PLAYER made move %s \n\n", move2str(playermove));
+            #endif
             make_move(&game, playermove, &undid[halfmove_ctr]);
             moves[halfmove_ctr] = playermove;
             halfmove_ctr++;
 
             chosenmove = id_best_move(control);
+            #ifdef LOG
+                fprintf(log, "BOT made move %s \n\n", move2str(chosenmove));
+            #endif
             if (chosenmove==0){ //Stalemate
                 printf("DRAW!!\n"); break;
             } else if (chosenmove==UINT16_MAX){ //Checkmate
@@ -128,40 +148,17 @@ int main(int argc, char *argv[]){
             halfmove_ctr++;
         }
     }
+    #ifdef LOG
+        fprintf(log, "\n\nTT is %.2f%% full\n", tt_fullness());
+    #endif
+
     tt_free();
+
+
+
+    fclose(log);
+
     return 0;
-}
-
-uint16_t str2move(const char move[]){
-    char from = move[0]-'a'+(move[1]-'1')*8;
-    char to = move[2]-'a'+(move[3]-'1')*8;
-    char promo = 0;
-    if (move[4]!='\0'){
-        if (move[4]=='r') promo=1;
-        if (move[4]=='b') promo=2;
-        if (move[4]=='n') promo=3;
-    }
-    return MAKE_MOVE(from, to, promo);
-}
-
-char* move2str(uint16_t move){
-    int from = MOVE_FROM(move);
-    int to   = MOVE_TO(move);
-    int flag = MOVE_FLAGS(move);
-    static char move_str[6] = "Chess";
-    sprintf(move_str, "%c%c%c%c",
-        'a' + (from % 8),
-        '1' + (from / 8),
-        'a' + (to % 8),
-        '1' + (to / 8)
-    );
-    // Add promotion piece if any (skipping q for efficiency)
-    if (flag == 1) move_str[4] = 'r';
-    else if (flag == 2) move_str[4] = 'b';
-    else if (flag == 3) move_str[4] = 'n';
-    else move_str[4] = '\0';
-
-    return move_str;
 }
 
 uint16_t id_best_move(float time_control){
@@ -171,6 +168,12 @@ uint16_t id_best_move(float time_control){
     uint16_t best_move = 0;
     uint8_t depth = 1;
     uint16_t best_given_move;
+
+    #ifdef LOG
+        if (time_control<=0) fprintf(log, "Ignore the next things\n");
+        fprintf(log, "Searching position %s \n", unload_position(&game));
+        fprintf(log, "TT is %.2f%% full\n", tt_fullness());
+    #endif
 
     while (0xA34){
         if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);

@@ -9,9 +9,13 @@ clock_t start;
 float bot_time_control = 1.0;
 float elapsed_time;
 uint64_t nodes;
+uint64_t qnodes;
+#ifdef LOG
+    FILE *log;
+#endif
 
 int quiesence_search(Position *pos, int alpha, int beta){
-    nodes++; //DEBUG
+    qnodes++; //DEBUG
     MoveList moves; LegalData legs; compute_pins_n_checks(pos, &legs);
     moves.count = 0;
     generate_moves(pos, &moves, &legs, legs.checkers ? GEN_ALL : GEN_QSN);
@@ -55,6 +59,7 @@ int quiesence_search(Position *pos, int alpha, int beta){
 }
 
 int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
+    nodes++;
     int alpha_orig = alpha;
     if (depth==0) return quiesence_search(pos, alpha, beta); //Quiesence comes later
 
@@ -68,13 +73,25 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         if (entry->flag == TT_UPPERBOUND && entry->score < beta)
             beta = entry->score;   // reduce beta
 
-        if (alpha >= beta)
-            return entry->score;   // cutoff
+        if (alpha >= beta) {
+            if (entry->flag == TT_LOWERBOUND) return alpha;
+            if (entry->flag == TT_UPPERBOUND) return beta;
+            return entry->score;
+        }
     }
 
     Undo undoer; MoveList moves; LegalData legs;
     moves.count = 0; bool timed_out = false; bool searched_any = false;
     generate_moves(pos, &moves, &legs, GEN_ALL);
+
+    #ifdef LOG
+        if (move){
+            fprintf(log, "Generated %d moves : ", moves.count);
+            for (uint8_t i=0; i<MIN(moves.count, 3); i++)
+                fprintf(log, "%s ", move2str(moves.moves[i]));
+            fprintf(log, "etc... \n");
+        }
+    #endif
 
     int ref = be_referee(pos, &moves, &legs, depth);
     if (ref!=1) return ref;
@@ -86,24 +103,36 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
     for (uint8_t i=0; i<moves.count; i++){
         make_move(pos, moves.moves[i], &undoer);
         int evalution = -search(pos, depth-1 + extender, -beta, -alpha, NULL);
+        searched_any = true;
         unmake_move(pos, moves.moves[i], &undoer);
 
-        if (evalution == -TIMEOUT){
+        if (evalution == -TIMEOUT){ //Timeout propagation
             timed_out = true;
-            if (move) break;
+            if (move && searched_any){
+                #ifdef LOG
+                    fprintf(log, "~~~~~~~TIMEOUT~~~~~~\n");
+                #endif
+                break;
+            }
             else if (searched_any) return TIMEOUT;
         }
 
-        if (evalution > best_score) {
+        if (evalution > best_score) { //Found better move
             best_score = evalution;
             best_move = moves.moves[i];
+            #ifdef LOG
+                if (move){
+                    fprintf(log, "New best move - %s Eval - %+d\n",
+                        move2str(best_move), best_score*(pos->side_to_move?-1:1));
+                }
+            #endif
         }
 
         if (evalution >= beta){ //Move was so good that the opponent prolly wants to avoid ts
             beta_cutoff = true;
             if (!move){
-                tt_store(pos->zobrist, depth, evalution, TT_LOWERBOUND, moves.moves[i]);
-                return evalution; //Stop this engine line, go *snip* MWAHAHA
+                tt_store(pos->zobrist, depth, beta, TT_LOWERBOUND, moves.moves[i]);
+                return beta; //Stop this engine line, go *snip* MWAHAHA
             }
 
             break;
@@ -115,15 +144,20 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         if ((nodes&0x3FF) <= 0x7F){
             elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
             if (elapsed_time >= bot_time_control){
-                if (move) break;
+                timed_out = true;
+                if (move){
+                    #ifdef LOG
+                        fprintf(log, "~~~~~~~TIMEOUT~~~~~~\n");
+                    #endif
+                    break;
+                }
                 else if (searched_any) return TIMEOUT;
             }
-            searched_any = true;
         }
     }
 
     //Write to TT
-    if (!timed_out && !move) {
+    if (searched_any && !move) {
         // store TT only if search was fully completed
         uint8_t flag;
         if (best_score <= alpha_orig) flag = TT_UPPERBOUND;
@@ -133,7 +167,13 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         tt_store(pos->zobrist, depth, best_score, flag, best_move);
     }
 
-    if (move) *move = best_move;
+    if (move){
+        *move = best_move;
+        #ifdef LOG
+            fprintf(log, "~~~~Nodes : %llu, QNodes : %llu, Combined : %llu~~~~\n",
+                nodes, qnodes, nodes+qnodes);
+        #endif
+    }
     //Return
     return best_score;
 }
@@ -147,8 +187,12 @@ uint8_t extensions(Position *pos, MoveList *moves, LegalData *legs){
 }
 
 uint16_t get_best_move(Position *pos, uint8_t depth){
-    nodes = 0;
+    nodes = 0; qnodes = 0;
     uint16_t move = 0;
+    #ifdef LOG
+        fprintf(log, "~~~~Depth %d~~~~\n",
+            depth);
+    #endif
     search(pos, depth, -INF, INF, &move);
 
     LegalData legs;

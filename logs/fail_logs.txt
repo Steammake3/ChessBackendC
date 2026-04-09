@@ -1,0 +1,103 @@
+Mar 7 2026 - 11:30 AM
+
+PS C:\Users\Dhairya\Desktop\Coding_Projects\CnotCpp\tutorials> ./bot.exe 10 b   
+\CnotCpp\tutorials> ./bot.exe 10 b
+----
+Hello! Use the following commands ->       
+        a1a1 - makes a move from a1 to a1 (obviously other moves like e2e4 also work) 
+        /d - prints ASCII repr of board, add a second character to show FEN too (WHITE, black)
+        Q - quits game
+        /undo - undoes previous move       
+        /log - prints a list of all moves played so far
+        /s {SQ} - gets piece[s] at SQ      
+        #{FEN} - loads a FEN
+
+e2e4
+At depth 7, taking 10.003000 seconds: h7h6
+d2d4
+At depth 7, taking 10.002000 seconds: b8c6
+d4d5
+At depth 9, taking 10.002000 seconds: c6e5
+f2f4
+At depth 9, taking 10.003000 seconds: e5g6
+g1f3
+At depth 9, taking 10.000000 seconds: e7e6
+c2c4
+At depth 8, taking 10.006000 seconds: f8b4
+b1c3
+At depth 8, taking 10.001000 seconds: g8f6
+e4e5
+At depth 8, taking 10.013000 seconds: f6e4
+d1d3
+At depth 8, taking 10.006000 seconds: e4c3
+b2c3
+At depth 8, taking 10.004000 seconds: b4c5
+c1e3
+At depth 9, taking 10.000000 seconds: d7d6
+e3c5
+At depth 9, taking 10.015000 seconds: d6c5
+d3e4
+At depth 9, taking 10.003000 seconds: f7f5
+e4e3
+At depth 9, taking 10.001000 seconds: e6d5
+a1d1
+At depth 9, taking 10.000000 seconds: c7c6
+e3c5
+At depth 9, taking 10.005000 seconds: g6f4
+c4d5
+At depth 9, taking 10.002000 seconds: f4d5
+c3c4
+At depth 10, taking 10.013000 seconds: d8e7
+c5d4
+At depth 9, taking 10.003000 seconds: d5b4
+d4d2
+At depth 9, taking 10.002000 seconds: c6c5
+f1e2
+At depth 9, taking 10.002000 seconds: e8g8
+e1g1
+At depth 9, taking 10.002000 seconds: f5f4
+a2a3
+At depth 9, taking 10.002000 seconds: b4c6
+d2c3
+At depth 8, taking 10.007000 seconds: f8e8
+e2d3
+At depth 9, taking 10.004000 seconds: c8g4
+d1e1
+At depth 9, taking 10.008000 seconds: g4f3
+f1f3
+At depth 9, taking 10.001000 seconds: c6e5
+f3f1
+At depth 8, taking 10.004000 seconds: f4f3
+d3e4
+At depth 8, taking 10.009000 seconds: f3g2
+e4g2
+At depth 8, taking 10.002000 seconds: a8d8
+g2d5
+At depth 8, taking 10.001000 seconds: g8h7
+c3c2
+At depth 7, taking 10.006000 seconds: h7h8
+g1h1
+At depth 8, taking 10.000000 seconds: d8b8
+f1f5
+At depth 10, taking 10.007000 seconds: e7c7
+c2e4
+At depth 10, taking 10.002000 seconds: e5g4
+e4e8
+At depth 10, taking 10.008000 seconds: b8e8
+e1e8
+At depth 10, taking 10.001000 seconds: h8h7
+e8e2
+At depth 10, taking 10.002000 seconds: g4f6
+d5g2
+At depth 9, taking 10.000000 seconds: c7d6
+e2e1
+At depth 9, taking 10.000000 seconds: f6g4
+h1g1
+At depth 9, taking 10.006000 seconds: d6h2
+g1f1
+At depth 10, taking 10.015000 seconds: h2g3
+f5f7
+At depth 10, taking 10.002000 seconds: g3e1
+f1e1
+At depth 11, taking 10.002000 seconds: h6h5
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Program crashed
