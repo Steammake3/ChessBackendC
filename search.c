@@ -10,6 +10,8 @@ float bot_time_control = 1.0;
 float elapsed_time;
 uint64_t nodes;
 uint64_t qnodes;
+uint16_t killer_moves[256][2] = {0}; //Hopefully I never search more than 128 fullmoves
+int history_moves[2][64][64] = {0}; //[SIDE][FROM][TO]
 #ifdef LOG
     FILE *log;
 #endif
@@ -27,9 +29,10 @@ int quiesence_search(Position *pos, int alpha, int beta){
     int ref = be_referee(pos, &moves, &legs, 0);
     if (ref!=1) return ref ? ref : stand_pat;
 
-    order_moves(&moves, pos, &legs); int best_score = -INF; Undo undoer;
+    order_moves(&moves, pos, &legs, 0); int best_score = -INF; Undo undoer;
 
     for (uint8_t i=0; i<moves.count; i++){
+        //TODO : look into Delta Pruning
         make_move(pos, moves.moves[i], &undoer);
         int evalution = -quiesence_search(pos, -beta, -alpha);
         unmake_move(pos, moves.moves[i], &undoer);
@@ -95,7 +98,7 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
 
     int ref = be_referee(pos, &moves, &legs, depth);
     if (ref!=1) return ref;
-    order_moves(&moves, pos, &legs);
+    order_moves(&moves, pos, &legs, depth);
     uint8_t extender = extensions(pos, &moves, &legs);
 
     int best_score = -INF; uint16_t best_move = 0; bool beta_cutoff = false;
@@ -130,6 +133,18 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
 
         if (evalution >= beta){ //Move was so good that the opponent prolly wants to avoid ts
             beta_cutoff = true;
+            uint16_t move_cutoff = moves.moves[i];
+
+            if (undoer.captured==NO_SQ){ //Move was NOT a capture
+                if (killer_moves[depth][0] != move_cutoff){
+                    killer_moves[depth][1] = killer_moves[depth][0];
+                    killer_moves[depth][0] = move_cutoff;
+                }
+
+                history_moves[pos->side_to_move][MOVE_FROM(move_cutoff)][MOVE_TO(move_cutoff)] =
+                    depth * depth;
+            }
+
             if (!move){
                 tt_store(pos->zobrist, depth, beta, TT_LOWERBOUND, moves.moves[i]);
                 return beta; //Stop this engine line, go *snip* MWAHAHA
@@ -213,14 +228,14 @@ uint16_t get_best_move(Position *pos, uint8_t depth){
     return move ? move : TIMEOUT_MOVE; //This is only to prevent broken things
 }
 //Move ordering
-void order_moves(MoveList *ml, Position *pos, LegalData *legs){
+void order_moves(MoveList *ml, Position *pos, LegalData *legs, uint8_t depth){
     const uint8_t k = 8; //How many moves to actually sort
     int n = ml->count;
 
     int scores[n];
     for (uint16_t i=0; i<n; i++){
         TTEntry *entry = tt_probe_ptr(pos->zobrist);
-        scores[i] = guess_move_priority(ml->moves[i], pos, legs, entry);
+        scores[i] = guess_move_priority(ml->moves[i], pos, legs, entry, depth);
     }
 
     uint8_t lim = k<n ? k : n;

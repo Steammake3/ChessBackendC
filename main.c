@@ -59,6 +59,9 @@ int main(int argc, char *argv[]){
 
     if (get_first_move){
         chosenmove = id_best_move(control);
+        #ifdef LOG
+            fprintf(log, "BOT made move %s \n\n", move2str(chosenmove));
+        #endif
         printf("%s\n", move2str(chosenmove));
         make_move(&game, chosenmove, &undid[halfmove_ctr]);
         moves[halfmove_ctr] = chosenmove;
@@ -73,10 +76,16 @@ int main(int argc, char *argv[]){
             memmove(taken, taken + 1, strlen(taken)); //Remove #
             load_position(taken, &game);
             printf("Loaded %.9s... successfully!\n", taken);
+            #ifdef LOG
+                fprintf(log, "LOADED FEN %s \n\n", taken);
+            #endif
             memset(undid, '\0', sizeof(undid)); memset(moves, '\0', sizeof(moves)); halfmove_ctr=0;//Clean up
             if (game.side_to_move == !get_first_move){ //If bot to move bruh
                 printf("Deciding upon move rn... \n");
                 chosenmove = id_best_move(control);
+                #ifdef LOG
+                    fprintf(log, "BOT made move %s \n\n", move2str(chosenmove));
+                #endif
                 printf("%s\n", move2str(chosenmove));
                 make_move(&game, chosenmove, &undid[halfmove_ctr]);
                 moves[halfmove_ctr] = chosenmove;
@@ -174,6 +183,9 @@ uint16_t id_best_move(float time_control){
         fprintf(log, "Searching position %s \n", unload_position(&game));
         fprintf(log, "TT is %.2f%% full\n", tt_fullness());
     #endif
+
+    if (game.fullmove&0b111 == 0)  //Every 8 moves (cuz nice compromise)
+        reset_killers(); //Reinitialze killer moves
 
     while (0xA34){
         if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);

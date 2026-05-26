@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #define NO_SQ 64
 #define WHITE 0
