@@ -29,6 +29,7 @@ typedef enum {
 } Pieces;
 
 typedef struct {
+    int mailbox[64]; //A fat mailbox, I don't care too much about size tho. Deal with it.
     uint64_t bitboards[12]; //White Pawn, Knight, Bishop ... Black Pawn... (PNBRQK)
     uint64_t occupancies[3]; //White, Black, Both
     uint8_t en_passant; //0-63 for actual EP, if en_passant>>6 then no en_passant

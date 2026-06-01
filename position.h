@@ -18,7 +18,11 @@ extern uint64_t BETWEEN[64][64]; //BETWEEN[start_square(excluded btw)][end_squar
 
 void add_piece(int index, Position *position, char piece);
 
-int piece_at(int index, Position *position);
+static inline int piece_at(int index, Position *position){
+    return position->mailbox[index];
+}
+
+int naive_piece_at(int index, Position *position);
 
 void load_position(const char fen[], Position *position);
 

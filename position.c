@@ -52,7 +52,7 @@ void add_piece(int index, Position *position, char piece){
     }
 }
 
-int piece_at(int index, Position *position){
+int naive_piece_at(int index, Position *position){
     if (index < 0 || index > 63) return NO_SQ;
     if (!((position->occupancies[2]>>index)&1)){return NO_SQ;}
     for (int i=0; i<12; i++){
@@ -101,6 +101,10 @@ void load_position(const char fen[], Position *position){
 
     init_hash(position);
     init_evaluate(position);
+
+    for (uint8_t i=0; i<64; i++){ //Do mailbox setup
+        position->mailbox[i] = naive_piece_at(i, position);
+    }
 }
 
 char* unload_position(Position* position){
@@ -240,6 +244,9 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
         int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq-1;
         pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
         pos->occupancies[side] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
+        //Mailbox
+        pos->mailbox[rook_from] = NO_SQ;
+        pos->mailbox[rook_to] = (side==WHITE?WR:BR);
         //Zob
         pos->zobrist ^= zh_pieces[side==WHITE?WR:BR][rook_from];
         pos->zobrist ^= zh_pieces[side==WHITE?WR:BR][rook_to];
@@ -254,6 +261,9 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     //True move in progress, crazy i know right?
     pos->bitboards[start_piece] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
     pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+    //Mailbox
+    pos->mailbox[start_sq] = NO_SQ;
+    pos->mailbox[end_sq] = start_piece;
     //Zob
     pos->zobrist ^= zh_pieces[start_piece][start_sq];
     pos->zobrist ^= zh_pieces[start_piece][end_sq];
@@ -265,6 +275,8 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
     if(captured_piece!=NO_SQ && !(en_passanting)){
         pos->bitboards[captured_piece] ^= 1ULL<<end_sq;
         pos->occupancies[side^1] ^= 1ULL<<end_sq;
+        //Mailbox
+            //Capture already handled :)
         //Zob
         pos->zobrist ^= zh_pieces[captured_piece][end_sq];
         //Eval (+= because opponent losing is good for us)
@@ -281,6 +293,8 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
         int cap_sq = side==BLACK ? end_sq+8 : end_sq-8;
         pos->bitboards[(side^1)*6+0] ^= (1ULL<<cap_sq);
         pos->occupancies[side^1] ^= (1ULL<<cap_sq);
+        //Mailbox
+        pos->mailbox[cap_sq] = NO_SQ;
         //Zob
         pos->zobrist ^= zh_pieces[(side^1)*6+0][cap_sq];
         //For the Undo flags
@@ -299,6 +313,8 @@ void make_move(Position *pos, uint16_t move, Undo *undo){
         uint8_t prp = 6*side+4-promo;
         pos->bitboards[start_piece] ^= (1ULL << end_sq);
         pos->bitboards[prp] ^= (1ULL << end_sq);
+        //Mailbox
+        pos->mailbox[end_sq] = (int) prp;
         //Zob
         pos->zobrist ^= zh_pieces[start_piece][end_sq];
         pos->zobrist ^= zh_pieces[prp][end_sq];
@@ -378,9 +394,15 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
         pos->bitboards[pawn] ^= (1ULL<<start_sq);      // restore pawn
 
         pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+        //Mailbox
+        pos->mailbox[start_sq] = pawn;
+        pos->mailbox[end_sq] = NO_SQ;
     } else {
         pos->bitboards[start_piece] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
         pos->occupancies[side] ^= (1ULL<<start_sq) | (1ULL<<end_sq);
+        //Mailbox
+        pos->mailbox[start_sq] = start_piece;
+        pos->mailbox[end_sq] = NO_SQ;
     }
 
     switch (undo->flags) {
@@ -388,6 +410,8 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
             int cap_sq = side==BLACK ? end_sq+8 : end_sq-8;
             pos->bitboards[(side^1)*6+WP] ^= (1ULL<<cap_sq);
             pos->occupancies[side^1] ^= (1ULL<<cap_sq);
+            //Mailbox
+            pos->mailbox[cap_sq] = (side^1)*6+WP;
             break;}
         
         case 2: {//Castling
@@ -395,6 +419,9 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
             int rook_to   = (end_sq>start_sq)? start_sq+1 : start_sq-1;
             pos->bitboards[(side==WHITE?WR:BR)] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
             pos->occupancies[side] ^= (1ULL<<rook_from)|(1ULL<<rook_to);
+            //Mailbox
+            pos->mailbox[rook_from] = (side==WHITE?WR:BR);
+            pos->mailbox[rook_to] = NO_SQ;
             break;}
         
         case 3: break; //Promotion previously handled
@@ -405,6 +432,8 @@ void unmake_move(Position *pos, uint16_t move, Undo *undo){
     if (captured_piece!=NO_SQ){ //In case of normal capture
         pos->bitboards[captured_piece] ^= 1ULL<<end_sq;
         pos->occupancies[side^1] ^= 1ULL<<end_sq;
+        //Mailbox
+        pos->mailbox[end_sq] = captured_piece;
     }
 
     pos->occupancies[BOTH] = pos->occupancies[WHITE] | pos->occupancies[BLACK];
