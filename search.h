@@ -22,6 +22,7 @@
 extern clock_t start;
 extern float bot_time_control;
 extern float elapsed_time;
+extern bool bot_has_timed_out;
 extern uint64_t nodes;
 extern uint64_t qnodes;
 extern uint16_t killer_moves[256][2];

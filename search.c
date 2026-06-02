@@ -8,6 +8,7 @@
 clock_t start;
 float bot_time_control = 1.0;
 float elapsed_time;
+bool bot_has_timed_out = false;
 uint64_t nodes;
 uint64_t qnodes;
 uint16_t killer_moves[256][2] = {0}; //Hopefully I never search more than 128 fullmoves
@@ -19,7 +20,7 @@ int history_moves[2][64][64] = {0}; //[SIDE][FROM][TO]
 int quiesence_search(Position *pos, int alpha, int beta){
     qnodes++; //DEBUG
     MoveList moves; LegalData legs; compute_pins_n_checks(pos, &legs);
-    moves.count = 0;
+    
     generate_moves(pos, &moves, &legs, legs.checkers ? GEN_ALL : GEN_QSN);
 
     int stand_pat = (bot_time_control==3.14159f) ? 314 : evaluate(pos);
@@ -37,7 +38,7 @@ int quiesence_search(Position *pos, int alpha, int beta){
         int evalution = -quiesence_search(pos, -beta, -alpha);
         unmake_move(pos, moves.moves[i], &undoer);
 
-        if (evalution == -TIMEOUT) return TIMEOUT;
+        if (bot_has_timed_out) return TIMEOUT;
 
         if (evalution > best_score) {
             best_score = evalution;
@@ -50,9 +51,10 @@ int quiesence_search(Position *pos, int alpha, int beta){
         }
         
         //Time check
-        if ((nodes&0x3FF) <= 0x7F){
+        if ((qnodes&0x3FF) == 0){
             elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
             if (elapsed_time >= bot_time_control){
+                bot_has_timed_out = true;
                 return TIMEOUT;
             }
         }
@@ -84,7 +86,7 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
     }
 
     Undo undoer; MoveList moves; LegalData legs;
-    moves.count = 0; bool timed_out = false; bool searched_any = false;
+    bool searched_any = false;
     generate_moves(pos, &moves, &legs, GEN_ALL);
 
     #ifdef LOG
@@ -106,11 +108,9 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
     for (uint8_t i=0; i<moves.count; i++){
         make_move(pos, moves.moves[i], &undoer);
         int evalution = -search(pos, depth-1 + extender, -beta, -alpha, NULL);
-        searched_any = true;
         unmake_move(pos, moves.moves[i], &undoer);
 
-        if (evalution == -TIMEOUT){ //Timeout propagation
-            timed_out = true;
+        if (bot_has_timed_out){ //Timeout propagation
             if (move && searched_any){
                 #ifdef LOG
                     fprintf(log, "~~~~~~~TIMEOUT~~~~~~\n");
@@ -156,24 +156,19 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         }
 
         //Time check
-        if ((nodes&0x3FF) <= 0x7F){
+        if ((nodes&0x3FF) == 0){
             elapsed_time = (float)(clock()-start) / CLOCKS_PER_SEC;
             if (elapsed_time >= bot_time_control){
-                timed_out = true;
-                if (move){
-                    #ifdef LOG
-                        fprintf(log, "~~~~~~~TIMEOUT~~~~~~\n");
-                    #endif
-                    break;
-                }
-                else if (searched_any) return TIMEOUT;
+                bot_has_timed_out = true;
             }
         }
+        
+        searched_any = true;
     }
 
     //Write to TT
-    if (searched_any && !move) {
-        // store TT only if search was fully completed
+    if (searched_any) {
+        // store TT only if search was ever done
         uint8_t flag;
         if (best_score <= alpha_orig) flag = TT_UPPERBOUND;
         else if (beta_cutoff) flag =  TT_LOWERBOUND;

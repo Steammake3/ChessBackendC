@@ -8,11 +8,18 @@ Position game;
 const char *info = "----\nHello! Use the following commands -> \n"
     "\ta1a1 - makes a move from a1 to a1 (obviously other moves like e2e4 also work)\n"
     "\t/d - prints ASCII repr of board, add a second character to show FEN too (WHITE, black)\n"
-    "\tQ - quits game\n"
+    "\tQ - quits game, add a second character to delete logs (if applicable)\n"
     "\t/undo - undoes previous move\n"
     "\t/log - prints a list of all moves played so far\n"
     "\t/s {SQ} - gets piece[s] at SQ\n"
-    "\t#{FEN} - loads a FEN\n\n";
+    "\t#{FEN} - loads a FEN\n"
+    "\t@{FEN} - show all internal information about a Position with this FEN\n\n";
+
+const char *examination_template = "\n------------\n%s" //2D view
+    "%s\n------------\n" //FEN string
+    "Zobrist is %016llX\n------------\n" //Zobrist
+    "Simple Mid Eval: %+d, Simple End Eval: %+d, Phase: %u (24 open, 0 end)\n------------\n" //Eval discretely
+    "Composited Final Evaluation: %+d\n------------\n\n"; //True eval
 
 int main(int argc, char *argv[]){
     if (argc!=3){
@@ -43,6 +50,7 @@ int main(int argc, char *argv[]){
     uint16_t chosenmove = 0;
     uint16_t playermove = 0;
     load_position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &game);
+    Position temp;
     
     #ifdef LOG
         time_t rn_tt = time(NULL);
@@ -70,7 +78,28 @@ int main(int argc, char *argv[]){
 
     while (0xA34){
         fgets(taken, sizeof(taken), stdin); taken[strcspn(taken, "\n")] = '\0';
-        if (taken[0]=='Q' || taken[0]=='q') break;
+        if (taken[0]=='Q' || taken[0]=='q') {
+            #ifdef LOG
+                fclose(log);
+                log = NULL;
+                if (taken[1]!='\0'){ //Check for second character
+                    if (remove(file_name)==0){
+                        printf("Successful deletion!\n");
+                    } else {
+                        printf("Whoops! Something went wrong. Delete manually\n");
+                    }
+                }
+            #endif
+            break;
+        }
+
+        else if (taken[0]=='@'){ //Examine FEN
+            memmove(taken, taken + 1, strlen(taken)); //Remove @
+            load_position(taken, &temp);
+            printf(examination_template, ascii_repr(&temp), unload_position(&temp),
+                temp.zobrist, temp.simple_eval_mid, temp.simple_eval_end, temp.phase,
+                evaluate(&temp));
+        }
 
         else if (taken[0]=='#'){ //Load FEN
             memmove(taken, taken + 1, strlen(taken)); //Remove #
@@ -174,6 +203,7 @@ uint16_t id_best_move(float time_control){
     clock_t start_time = clock();
     //Give bot ts
     bot_time_control = time_control<0.0 ? 3.14159f : time_control; start = start_time;
+    bot_has_timed_out = false;
     uint16_t best_move = 0;
     uint8_t depth = 1;
     uint16_t best_given_move;
@@ -195,8 +225,10 @@ uint16_t id_best_move(float time_control){
         }
         //Invoke search
         best_given_move = get_best_move(&game, depth);
-        if (best_given_move && (best_given_move!=TIMEOUT_MOVE)) best_move = best_given_move; //Don't store nullmoves
-        depth++;
+        if (best_given_move && (best_given_move!=TIMEOUT_MOVE)) {
+            best_move = best_given_move; //Don't store nullmoves
+            depth++;
+        }
     }
     if (time_control>0) printf("At depth %i, taking %f seconds: ", depth, elapsed_time);
     return best_move;
