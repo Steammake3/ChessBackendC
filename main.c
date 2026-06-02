@@ -193,7 +193,7 @@ int main(int argc, char *argv[]){
     tt_free();
 
 
-
+    fflush(log);
     fclose(log);
 
     return 0;
@@ -217,18 +217,18 @@ uint16_t id_best_move(float time_control){
     if (game.fullmove&0b111 == 0)  //Every 8 moves (cuz nice compromise)
         reset_killers(); //Reinitialze killer moves
 
-    while (0xA34){
+    while (depth < 50){
         if (time_control<0 && depth==1) best_move = get_best_move(&game, depth);
-        elapsed_time = (float)(clock()-start_time) / CLOCKS_PER_SEC;
-        if (elapsed_time >= time_control || time_control<0){
+        if (bot_has_timed_out || time_control<0){
             break;
         }
         //Invoke search
         best_given_move = get_best_move(&game, depth);
         if (best_given_move && (best_given_move!=TIMEOUT_MOVE)) {
             best_move = best_given_move; //Don't store nullmoves
-            depth++;
         }
+        if (bot_has_timed_out) break;
+        depth++;
     }
     if (time_control>0) printf("At depth %i, taking %f seconds: ", depth, elapsed_time);
     return best_move;

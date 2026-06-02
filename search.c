@@ -71,6 +71,13 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
     //TT!
     TTEntry *entry = tt_probe_ptr(pos->zobrist);
     if (entry && entry->depth >= depth) {
+        if (move){
+            *move = entry->move;
+            #ifdef LOG
+                fprintf(log, "Pulled PVS move %s from TT, flag %s\n", move2str(*move),
+                    entry->flag == TT_EXACT ? "EXACT" : (entry->flag==TT_LOWERBOUND ? "LOWER" : "UPPER"));
+            #endif
+        }
         if (entry->flag == TT_EXACT)
             return entry->score;  // exact score
         if (entry->flag == TT_LOWERBOUND && entry->score > alpha)
@@ -103,11 +110,12 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
     order_moves(&moves, pos, &legs, depth);
     uint8_t extender = extensions(pos, &moves, &legs);
 
-    int best_score = -INF; uint16_t best_move = 0; bool beta_cutoff = false;
+    //-500 makes it so that it must choose a move at some point
+    int best_score = -INF-500; uint16_t best_move = 0; bool beta_cutoff = false;
     //Search
     for (uint8_t i=0; i<moves.count; i++){
         make_move(pos, moves.moves[i], &undoer);
-        int evalution = -search(pos, depth-1 + extender, -beta, -alpha, NULL);
+        int evalution = -search(pos, depth-1, -beta, -alpha, NULL);
         unmake_move(pos, moves.moves[i], &undoer);
 
         if (bot_has_timed_out){ //Timeout propagation
@@ -134,6 +142,7 @@ int search(Position *pos, uint8_t depth, int alpha, int beta, uint16_t *move){
         if (evalution >= beta){ //Move was so good that the opponent prolly wants to avoid ts
             beta_cutoff = true;
             uint16_t move_cutoff = moves.moves[i];
+            best_move = move_cutoff;
 
             if (undoer.captured==NO_SQ){ //Move was NOT a capture
                 if (killer_moves[depth][0] != move_cutoff){
@@ -203,7 +212,11 @@ uint16_t get_best_move(Position *pos, uint8_t depth){
         fprintf(log, "~~~~Depth %d~~~~\n",
             depth);
     #endif
-    search(pos, depth, -INF, INF, &move);
+    int bestest = search(pos, depth, -INF, INF, &move);
+    if (bestest == INF){
+        bot_has_timed_out = true;
+        printf("Chose %X\n", move);
+    }
 
     LegalData legs;
     compute_pins_n_checks(pos, &legs);
