@@ -26,6 +26,8 @@ int main(int argc, char *argv[]){
         printf("USAGE - BOT time_control{float} side_of_bot{w|b}"); return 1;
     }
 
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     float control;
     bool get_first_move;
     Undo undid[MAX_HISTORY]; memset(undid, '\0', sizeof(undid));
@@ -57,7 +59,11 @@ int main(int argc, char *argv[]){
         struct tm *rn = localtime(&rn_tt);
 
         char file_name[128] = {0}; 
-        strftime(file_name, sizeof(file_name), "./logs/Game_%b%d_%H-%M.txt", rn);
+        char t_buf[128] = {0};
+        strftime(t_buf, sizeof(t_buf), "./logs/Game_%b%d_%H-%M", rn);
+
+        sprintf(file_name, "%s-ID%.2f-%c.txt", t_buf, (double)(clock()) * 1000.0 / CLOCKS_PER_SEC,
+            get_first_move ? 'W' : 'B');
 
         log = fopen(file_name, "a");
         printf("~~~CREATED LOG FILE~~~\n\n");
@@ -185,6 +191,13 @@ int main(int argc, char *argv[]){
             moves[halfmove_ctr] = chosenmove;
             halfmove_ctr++;
         }
+
+        chosenmove = id_best_move(-1.0);
+        if (chosenmove==0){ //Stalemate
+            printf("DRAW!!\n"); break;
+        } else if (chosenmove==UINT16_MAX){ //Checkmate
+            printf("CHECKMATE!! %s wins!\n", get_first_move ? "WHITE" : "black"); break;
+        }
     }
     #ifdef LOG
         fprintf(log, "\n\nTT is %.2f%% full\n", tt_fullness());
@@ -231,7 +244,7 @@ uint16_t id_best_move(float time_control){
         if (bot_has_timed_out) break;
         depth++;
     }
-    if (time_control>0) printf("At depth %i, taking %f seconds: ", depth, elapsed_time);
+    if (time_control>0 && !(best_move==0 || best_move==UINT16_MAX)) printf("At depth %i, taking %f seconds: ", depth, elapsed_time);
     return best_move;
 }
 
