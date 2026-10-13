@@ -97,7 +97,7 @@ static inline char* move2str(uint16_t move){
 }
 
 
-//DEBUG Statements
-#define LOG //Write logs
+// Configuration
+#include "config.h"
 
 #endif

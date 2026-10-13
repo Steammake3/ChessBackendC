@@ -192,9 +192,10 @@ int main(int argc, char *argv[]){
 
     tt_free();
 
-
+    #ifdef LOG
     fflush(log);
     fclose(log);
+    #endif
 
     return 0;
 }
