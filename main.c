@@ -60,7 +60,7 @@ int main(int argc, char *argv[]){
 
         char file_name[128] = {0}; 
         char t_buf[128] = {0};
-        strftime(t_buf, sizeof(t_buf), "./logs/Game_%b%d_%H-%M", rn);
+        strftime(t_buf, sizeof(t_buf), "./logs/Game_%b%d_%H-%M-%S", rn);
 
         sprintf(file_name, "%s-ID%.2f-%c.txt", t_buf, (double)(clock()) * 1000.0 / CLOCKS_PER_SEC,
             get_first_move ? 'W' : 'B');
